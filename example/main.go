@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"log"
 	"time"
 
@@ -31,8 +32,11 @@ type MembershipFee struct {
 	Quantity uint // quantity in EUR cents
 }
 
+//go:embed migrations
+var migrationFiles embed.FS
+
 func main() {
-	if err := app.Init(); err != nil {
+	if err := app.Init(app.InitSQL(migrationFiles)); err != nil {
 		log.Fatalln("Could not initialize app:", err)
 	}
 

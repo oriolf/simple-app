@@ -1,8 +1,12 @@
 package app
 
+// TODO Interesting approaches in diversos/temperatures
 import (
 	"bytes"
+	"database/sql"
+	"embed"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -34,14 +38,32 @@ type JsonResponse struct {
 
 func (r JsonResponse) Status() int { return r.status }
 
-func Init() error {
-	// TODO connect to sqlite database, execute migrations, and set database in
-	// a global variable which will be sent to each handler inside the
-	// NewRequest object
+var (
+	db *sql.DB
+)
+
+type Option func() error
+
+func InitSQL(migrationFiles embed.FS) Option {
+	return func() (err error) {
+		if db, err = initSQL(migrationFiles); err != nil {
+			return fmt.Errorf("could not initialize sql: %w", err)
+		}
+		return nil
+	}
+}
+
+func Init(options ...Option) (err error) {
+	for _, opt := range options {
+		if err := opt(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func ServeHTTP() error {
+	defer db.Close()
 	log.Println("Listening...")
 	return http.ListenAndServe(":8080", nil)
 }
