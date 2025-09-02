@@ -18,7 +18,8 @@ type Adder interface {
 
 type Option func() error
 
-type command struct {
-	name    string
-	handler func()
+type Command struct {
+	Name     string
+	Handler  func()
+	Commands []Command
 }

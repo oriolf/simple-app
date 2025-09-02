@@ -40,24 +40,34 @@ func main() {
 		log.Fatalln("Could not initialize app:", err)
 	}
 
-	app.Execute(app.HTTPCommand(http), app.CLICommand(cli))
+	app.Execute(
+		app.Command{
+			Name:    "http",
+			Handler: http,
+		},
+		app.Command{
+			Name: "user",
+			Commands: []app.Command{{
+				Name:    "add",
+				Handler: app.CLIAdd(MemberFactory),
+			}},
+		},
+	)
 }
 
 func http() {
-	// if command http, execute all http code
 	app.HandleHTTP("GET /ok", app.FixedJsonResponse(map[string]bool{"ok": true}))
 
 	// TODO make them authentication required
-	// app.HandleHTTP("GET /members", app.JsonPaginatedList(Member))
-	app.HandleHTTP("POST /members", app.Add(MemberFactory))
-	// app.HandleHTTP("PUT /members/:id", app.Update(MemberFactory))
-	// app.HandleHTTP("PATCH /members/:id", app.Patch(MemberFactory))
+	// app.HandleHTTP("GET /members", app.HTTPList(Member))
+	app.HandleHTTP("POST /members", app.HTTPAdd(MemberFactory))
+	// app.HandleHTTP("PUT /members/:id", app.HTTPUpdate(MemberFactory))
+	// app.HandleHTTP("PATCH /members/:id", app.HTTPPatch(MemberFactory))
 
 	log.Fatalln(app.ServeHTTP())
 }
 
 func cli() {
-	// if command cli, execute all cli code
 	// app.HandleCli("user add", app.Add(User))
 }
 

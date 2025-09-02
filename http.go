@@ -80,7 +80,7 @@ func FixedJsonResponse(res any) func(Request) Response {
 	}
 }
 
-func Add[T Adder](seed func() T) func(Request) Response {
+func HTTPAdd[T Adder](seed func() T) func(Request) Response {
 	return func(r Request) Response {
 		decoder := json.NewDecoder(r.r.Body)
 		a := seed()

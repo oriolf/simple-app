@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -eo pipefail
+
+function dev {
+    chsum1=''
+    while [[ true ]]
+    do
+        chsum2=`find .. -type f -mtime -1 -exec md5sum {} \;`
+        if [[ $chsum1 != $chsum2 ]]; then
+            __restart
+            chsum1=$chsum2
+        fi
+        sleep 1
+    done
+}
+
+function __restart {
+    killall example || true
+    go build
+    ./example http & 
+}
+
+function help {
+    printf "Ús: %s <comanda> [args]\n\nComandes disponibles:\n" "${0}"
+
+    compgen -A function | grep -v "^_" | cat -n
+}
+
+function _shortlist {
+    compgen -A function | grep -v "^_" | tr '\n' ' '
+}
+
+if [[ "$1" == "_shortlist" ]]; then
+    _shortlist
+    exit 0
+fi
+
+TIMEFORMAT=$'\nTasca completada en %3lR'
+time "${@:-help}"

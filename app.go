@@ -33,30 +33,31 @@ func InitSQL(migrationFiles embed.FS) Option {
 	}
 }
 
-func Execute(commands ...command) {
+func Execute(commands ...Command) {
+	execute(os.Args[1:], commands...)
+}
+
+func execute(args []string, commands ...Command) {
 	var commandNames []string
 	for _, c := range commands {
-		commandNames = append(commandNames, c.name)
+		commandNames = append(commandNames, c.Name)
 	}
 	options := fmt.Sprintf(" Choose one of: %s\n", strings.Join(commandNames, ", "))
-	if len(os.Args) < 2 {
+	if len(args) < 1 {
 		log.Fatalf("Unspecified command." + options)
 	}
 
 	for _, c := range commands {
-		if os.Args[1] == c.name {
-			c.handler()
-			return
+		if args[0] == c.Name {
+			if c.Handler != nil {
+				c.Handler()
+				return
+			} else {
+				execute(args[1:], c.Commands...)
+				return
+			}
 		}
 	}
 
-	log.Fatalf("Unknown command «%s»." + options)
-}
-
-func HTTPCommand(f func()) command {
-	return command{name: "http", handler: f}
-}
-
-func CLICommand(f func()) command {
-	return command{name: "cli", handler: f}
+	log.Fatalf("Unknown command «%s»."+options, args[0])
 }
