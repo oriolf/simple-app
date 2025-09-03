@@ -6,7 +6,7 @@ function dev {
     chsum1=''
     while [[ true ]]
     do
-        chsum2=`find .. -type f -mtime -1 -exec md5sum {} \;`
+        chsum2=`find .. -type f -mtime -1 -not -path '../.git/*' -not -path '*.swp' -not -path '../example/example' -not -path '../example/db.db' -exec md5sum {} \;`
         if [[ $chsum1 != $chsum2 ]]; then
             __restart
             chsum1=$chsum2

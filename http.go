@@ -6,12 +6,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"sync/atomic"
 	"time"
 )
 
 type Request struct {
-	id      uint64
+	id      uint
 	r       *http.Request
 	started time.Time
 }
@@ -32,7 +33,7 @@ var requestId uint64
 
 func NewRequest(r *http.Request) Request {
 	id := atomic.AddUint64(&requestId, 1)
-	return Request{id: id, r: r, started: time.Now()}
+	return Request{id: uint(id), r: r, started: time.Now()}
 }
 
 func (r Request) took() time.Duration {
@@ -93,11 +94,26 @@ func HTTPAdd[T Adder](seed func() T) func(Request) Response {
 			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors))
 		}
 
-		if err := a.Add(); err != nil {
+		if err := transaction(db, a.Add); err != nil {
 			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
 		}
 
 		return r.jsonResponse(http.StatusOK, map[string]any{"id": a.GetID()})
+	}
+}
+func HTTPGet[T Getter](seed func() T) func(Request) Response {
+	return func(r Request) Response {
+		id, err := strconv.Atoi(r.r.PathValue("id"))
+		if err != nil {
+			return r.jsonResponse(http.StatusBadRequest, formError(err.Error()))
+		}
+
+		a := seed()
+		if err := a.Get(db, uint(id)); err != nil {
+			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
+		}
+
+		return r.jsonResponse(http.StatusOK, a)
 	}
 }
 

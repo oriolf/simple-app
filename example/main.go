@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"embed"
+	"fmt"
 	"log"
 	"time"
 
@@ -9,27 +11,27 @@ import (
 )
 
 type User struct {
-	ID       uint64
+	ID       uint
 	Email    string
 	Password string
 	Salt     string
 }
 
 type Member struct {
-	ID       uint64
-	Name     string
-	NIF      string
-	JoinedOn app.Date
-	LeftOn   *app.Date
-	IBAN     string
+	ID       uint      `json:"id"`
+	Name     string    `json:"name"`
+	NIF      string    `json:"nif"`
+	JoinedOn app.Date  `json:"joined_on"`
+	LeftOn   *app.Date `json:"left_on"`
+	IBAN     string    `json:"iban"`
 }
 
 type MembershipFee struct {
-	ID       uint64
-	MemberID uint64
+	ID       uint
+	MemberID uint
 	Year     uint
 	PaidOn   time.Time
-	Quantity uint64 // quantity in EUR cents
+	Quantity uint // quantity in EUR cents
 }
 
 //go:embed migrations
@@ -60,6 +62,7 @@ func http() {
 
 	// TODO make them authentication required
 	// app.HandleHTTP("GET /members", app.HTTPList(Member))
+	app.HandleHTTP("GET /members/{id}", app.HTTPGet(MemberFactory))
 	app.HandleHTTP("POST /members", app.HTTPAdd(MemberFactory))
 	// app.HandleHTTP("PUT /members/:id", app.HTTPUpdate(MemberFactory))
 	// app.HandleHTTP("PATCH /members/:id", app.HTTPPatch(MemberFactory))
@@ -71,9 +74,9 @@ func cli() {
 	// app.HandleCli("user add", app.Add(User))
 }
 
-func MemberFactory() Member { return Member{} }
+func MemberFactory() *Member { return &Member{} }
 
-func (m Member) GetID() uint64 { return m.ID }
+func (m Member) GetID() uint { return m.ID }
 func (m Member) Validate() app.ApiErrors {
 	return app.Validate(
 		app.ValidateStringNonEmpty("name", m.Name),
@@ -82,7 +85,22 @@ func (m Member) Validate() app.ApiErrors {
 		// app.ValidateIBAN("iban", m.IBAN),
 	)
 }
-func (m Member) Add() error {
-	log.Println("Adding member...")
+func (m *Member) Add(tx *sql.Tx) error {
+	res, err := tx.Exec("INSERT INTO members (name) VALUES (?);", m.Name)
+	if err != nil {
+		return fmt.Errorf("could not insert: %w", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("could not get last id: %w", err)
+	}
+	m.ID = uint(id)
+	return nil
+}
+func (m *Member) Get(db *sql.DB, id uint) error {
+	row := db.QueryRow("SELECT id, name FROM members WHERE id=?;", id)
+	if err := row.Scan(&m.ID, &m.Name); err != nil {
+		return fmt.Errorf("could not select: %w", err)
+	}
 	return nil
 }
