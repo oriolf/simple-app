@@ -80,13 +80,14 @@ func (m Member) GetID() uint { return m.ID }
 func (m Member) Validate() app.ApiErrors {
 	return app.Validate(
 		app.ValidateStringNonEmpty("name", m.Name),
-		// app.ValidateSpanishNIF("nif", m.NIF),
-		// app.ValidateDate("joined_on", m.JoinedOn),
+		app.ValidateSpanishDNI("nif", m.NIF),
+		app.ValidateDate("joined_on", m.JoinedOn),
 		// app.ValidateIBAN("iban", m.IBAN),
 	)
 }
 func (m *Member) Add(tx *sql.Tx) error {
-	res, err := tx.Exec("INSERT INTO members (name) VALUES (?);", m.Name)
+	res, err := tx.Exec("INSERT INTO members (name, nif, joined_on) VALUES (?, ?, ?);",
+		m.Name, m.NIF, m.JoinedOn.String())
 	if err != nil {
 		return fmt.Errorf("could not insert: %w", err)
 	}

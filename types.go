@@ -13,8 +13,19 @@ type Date struct {
 }
 
 func (d *Date) MarshalJSON() ([]byte, error) {
-	s := fmt.Sprintf(`"%d-%02d-%02d"`, d.Year, d.Month, d.Day)
-	return []byte(s), nil
+	return []byte(fmt.Sprintf(`"%s"`, d.String())), nil
+}
+
+func (d *Date) UnmarshalJSON(b []byte) error {
+	if _, err := fmt.Sscanf(string(b), `"%d-%d-%d"`, &d.Year, &d.Month, &d.Day); err != nil {
+		return fmt.Errorf("could not scan date: %w", err)
+	}
+
+	return nil
+}
+
+func (d Date) String() string {
+	return fmt.Sprintf("%d-%0d-%0d", d.Year, d.Month, d.Day)
 }
 
 type ApiErrors = map[string][]string
