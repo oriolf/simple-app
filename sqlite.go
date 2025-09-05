@@ -94,7 +94,7 @@ func transaction(db *sql.DB, f func(*sql.Tx) error) error {
 	return nil
 }
 
-func QueryDB[T any](scanFunc func(rows *sql.Rows) (T, error), stmt string, args ...any) ([]T, error) {
+func QueryDB[T any](db *sql.DB, scanFunc func(rows *sql.Rows) (T, error), stmt string, args ...any) ([]T, error) {
 	rows, err := db.Query(stmt, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
@@ -117,4 +117,49 @@ func QueryDB[T any](scanFunc func(rows *sql.Rows) (T, error), stmt string, args 
 	}
 
 	return res, nil
+}
+
+func Add[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
+	res, err := m.Insert(tx)
+	if err != nil {
+		return 0, fmt.Errorf("could not insert: %w", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("could not get last id: %w", err)
+	}
+	return uint(id), nil
+}
+
+func Get[T SQLGetter[T]](db *sql.DB, m T, id uint) (T, error) {
+	items, err := QueryDB(db, m.Scan, m.SelectSQL()+" WHERE id=?;", id)
+	if err != nil {
+		return m, fmt.Errorf("could not select: %w", err)
+	}
+	if len(items) == 0 {
+		return m, fmt.Errorf("item not found")
+	}
+	return items[0], nil
+}
+
+func List[T SQLLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, total uint, err error) {
+	row := db.QueryRow(m.CountSQL())
+	if err := row.Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("could not count: %w", err)
+	}
+
+	sql := m.SelectSQL() + m.OrderSQL()
+	if paginator != nil {
+		sql = sql + "OFFSET ? LIMIT ?;"
+		offset, limit := paginator.Offset(), paginator.Limit()
+		items, err = QueryDB(db, m.Scan, sql, offset, limit)
+	} else {
+		items, err = QueryDB(db, m.Scan, sql+";")
+	}
+
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not select: %w", err)
+	}
+
+	return items, total, nil
 }

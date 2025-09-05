@@ -1,6 +1,5 @@
 package app
 
-// TODO Interesting approaches in diversos/temperatures
 import (
 	"database/sql"
 	"embed"

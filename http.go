@@ -2,7 +2,9 @@ package app
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -94,26 +96,47 @@ func HTTPAdd[T Adder](seed func() T) func(Request) Response {
 			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors))
 		}
 
-		if err := transaction(db, a.Add); err != nil {
+		var id uint
+		f := func(tx *sql.Tx) (err error) {
+			id, err = a.Add(tx)
+			return err
+		}
+		if err := transaction(db, f); err != nil {
 			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
 		}
 
-		return r.jsonResponse(http.StatusOK, map[string]any{"id": a.GetID()})
+		return r.jsonResponse(http.StatusOK, map[string]any{"id": id})
 	}
 }
-func HTTPGet[T Getter](seed func() T) func(Request) Response {
+func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		if err != nil {
 			return r.jsonResponse(http.StatusBadRequest, formError(err.Error()))
 		}
 
-		a := seed()
-		if err := a.Get(db, uint(id)); err != nil {
+		a, err := seed.Get(db, uint(id))
+		fmt.Printf("%#v", a)
+		if err != nil {
 			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
 		}
 
 		return r.jsonResponse(http.StatusOK, a)
+	}
+}
+func HTTPList[T Lister[T]](seed T) func(Request) Response {
+	return func(r Request) Response {
+		// TODO create Paginator and parse query params page and itemsPerPage
+		items, total, err := seed.List(db, nil)
+		if err != nil {
+			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
+		}
+
+		fmt.Printf("%#v", items[0])
+		return r.jsonResponse(http.StatusOK, map[string]any{
+			"total": total,
+			"items": items,
+		})
 	}
 }
 
