@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -116,7 +115,6 @@ func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 		}
 
 		a, err := seed.Get(db, uint(id))
-		fmt.Printf("%#v", a)
 		if err != nil {
 			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
 		}
@@ -127,12 +125,11 @@ func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 func HTTPList[T Lister[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		// TODO create Paginator and parse query params page and itemsPerPage
-		items, total, err := seed.List(db, nil)
+		items, total, err := seed.List(db, NewPaginator(r.r))
 		if err != nil {
 			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
 		}
 
-		fmt.Printf("%#v", items[0])
 		return r.jsonResponse(http.StatusOK, map[string]any{
 			"total": total,
 			"items": items,

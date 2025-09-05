@@ -150,9 +150,9 @@ func List[T SQLLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, tota
 
 	sql := m.SelectSQL() + m.OrderSQL()
 	if paginator != nil {
-		sql = sql + "OFFSET ? LIMIT ?;"
-		offset, limit := paginator.Offset(), paginator.Limit()
-		items, err = QueryDB(db, m.Scan, sql, offset, limit)
+		sql = sql + "LIMIT ? OFFSET ?;"
+		limit, offset := paginator.Limit(), paginator.Offset()
+		items, err = QueryDB(db, m.Scan, sql, limit, offset)
 	} else {
 		items, err = QueryDB(db, m.Scan, sql+";")
 	}

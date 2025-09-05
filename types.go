@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -72,6 +74,31 @@ type Lister[T any] interface {
 type Paginator interface {
 	Limit() uint
 	Offset() uint
+}
+
+type paginator struct {
+	page         uint
+	itemsPerPage uint
+}
+
+func (p paginator) Limit() uint {
+	return p.itemsPerPage
+}
+
+func (p paginator) Offset() uint {
+	return (p.page - 1) * p.itemsPerPage
+}
+
+func NewPaginator(r *http.Request) paginator {
+	page, _ := strconv.Atoi(r.FormValue("page"))
+	itemsPerPage, _ := strconv.Atoi(r.FormValue("itemsPerPage"))
+	if page <= 0 {
+		page = 1
+	}
+	if itemsPerPage <= 0 {
+		itemsPerPage = 10
+	}
+	return paginator{page: uint(page), itemsPerPage: uint(itemsPerPage)}
 }
 
 type Scanner[T any] interface {
