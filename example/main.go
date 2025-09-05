@@ -49,7 +49,7 @@ func http() {
 	app.HandleHTTP("GET /members", app.HTTPList(Member{}))
 	app.HandleHTTP("GET /members/{id}", app.HTTPGet(Member{}))
 	app.HandleHTTP("POST /members", app.HTTPAdd(MemberFactory))
-	// app.HandleHTTP("PUT /members/{id}", app.HTTPUpdate(MemberFactory))
+	app.HandleHTTP("PUT /members/{id}", app.HTTPUpdate(MemberFactory))
 	// app.HandleHTTP("PATCH /members/{id}", app.HTTPPatch(MemberFactory))
 
 	log.Fatalln(app.ServeHTTP())

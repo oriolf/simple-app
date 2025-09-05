@@ -58,9 +58,19 @@ func (d *Date) FromString(s string) error {
 
 type ApiErrors = map[string][]string
 
+type Validator interface {
+	Validate() ApiErrors
+}
+
 type Adder interface {
 	Add(*sql.Tx) (uint, error)
-	Validate() ApiErrors
+	Validator
+}
+
+type Updater interface {
+	SetID(uint)
+	Update(*sql.Tx) error
+	Validator
 }
 
 type Getter[T any] interface {
@@ -106,7 +116,11 @@ type Scanner[T any] interface {
 }
 
 type SQLInserter interface {
-	Insert(*sql.Tx) (sql.Result, error)
+	SQLInsert(*sql.Tx) (sql.Result, error)
+}
+
+type SQLUpdater interface {
+	SQLUpdate(*sql.Tx) error
 }
 
 type SQLSelecter interface {

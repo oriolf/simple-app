@@ -107,6 +107,34 @@ func HTTPAdd[T Adder](seed func() T) func(Request) Response {
 		return r.jsonResponse(http.StatusOK, map[string]any{"id": id})
 	}
 }
+
+func HTTPUpdate[T Updater](seed func() T) func(Request) Response {
+	return func(r Request) Response {
+		id, err := strconv.Atoi(r.r.PathValue("id"))
+		if err != nil {
+			return r.jsonResponse(http.StatusBadRequest, formError(err.Error()))
+		}
+
+		decoder := json.NewDecoder(r.r.Body)
+		a := seed()
+		if err := decoder.Decode(&a); err != nil {
+			r.Log("Could not decode data: %s", err)
+			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada"))
+		}
+
+		a.SetID(uint(id))
+		if errors := a.Validate(); len(errors) > 0 {
+			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors))
+		}
+
+		if err := transaction(db, a.Update); err != nil {
+			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
+		}
+
+		return r.jsonResponse(http.StatusOK, map[string]any{})
+	}
+}
+
 func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
@@ -122,6 +150,7 @@ func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 		return r.jsonResponse(http.StatusOK, a)
 	}
 }
+
 func HTTPList[T Lister[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		// TODO create Paginator and parse query params page and itemsPerPage

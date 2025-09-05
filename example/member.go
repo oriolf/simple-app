@@ -15,9 +15,11 @@ type Member struct {
 	IBAN     *string   `json:"iban"`
 }
 
-func MemberFactory() Member { return Member{} }
+func MemberFactory() *Member { return &Member{} }
 
 // Business methods
+
+func (m *Member) SetID(id uint) { m.ID = id }
 
 func (m Member) Validate() app.ApiErrors {
 	return app.Validate(
@@ -32,6 +34,10 @@ func (m Member) Add(tx *sql.Tx) (uint, error) {
 	return app.Add(tx, m)
 }
 
+func (m Member) Update(tx *sql.Tx) error {
+	return app.Update(tx, m)
+}
+
 func (m Member) Get(db *sql.DB, id uint) (Member, error) {
 	return app.Get(db, m, id)
 }
@@ -41,9 +47,15 @@ func (m Member) List(db *sql.DB, paginator app.Paginator) (members []Member, tot
 }
 
 // SQL methods
-func (m Member) Insert(tx *sql.Tx) (sql.Result, error) {
+func (m Member) SQLInsert(tx *sql.Tx) (sql.Result, error) {
 	return tx.Exec("INSERT INTO members (name, nif, joined_on) VALUES (?, ?, ?);",
-		m.Name, m.NIF, m.JoinedOn.String())
+		m.Name, m.NIF, m.JoinedOn)
+}
+
+func (m Member) SQLUpdate(tx *sql.Tx) error {
+	_, err := tx.Exec("UPDATE members SET name=?, nif=?, joined_on=? WHERE id=?;",
+		m.Name, m.NIF, m.JoinedOn, m.ID)
+	return err
 }
 
 func (Member) Scan(rows *sql.Rows) (m Member, err error) {

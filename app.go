@@ -1,3 +1,10 @@
+// TODO when an sql mutation fails, we should convert the error received into
+// something understandable we should provide for each operation (eg Add) a map
+// that for a substring of the database error (for example, "UNIQUE constraint
+// failed: members.nif"), we provide the affected field (in this case, "nif")
+// and the actual message to show (something like "No pot haver dos sòcies amb
+// el mateix DNI"); the framework should make that translation inside
+// formError, which is what's called when an unknown error is raised
 package app
 
 import (

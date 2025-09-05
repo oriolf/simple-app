@@ -120,7 +120,7 @@ func QueryDB[T any](db *sql.DB, scanFunc func(rows *sql.Rows) (T, error), stmt s
 }
 
 func Add[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
-	res, err := m.Insert(tx)
+	res, err := m.SQLInsert(tx)
 	if err != nil {
 		return 0, fmt.Errorf("could not insert: %w", err)
 	}
@@ -129,6 +129,13 @@ func Add[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
 		return 0, fmt.Errorf("could not get last id: %w", err)
 	}
 	return uint(id), nil
+}
+
+func Update[T SQLUpdater](tx *sql.Tx, m T) error {
+	if err := m.SQLUpdate(tx); err != nil {
+		return fmt.Errorf("could not update: %w", err)
+	}
+	return nil
 }
 
 func Get[T SQLGetter[T]](db *sql.DB, m T, id uint) (T, error) {
