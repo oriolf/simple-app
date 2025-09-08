@@ -153,7 +153,6 @@ func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 
 func HTTPList[T Lister[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
-		// TODO create Paginator and parse query params page and itemsPerPage
 		items, total, err := seed.List(db, NewPaginator(r.r))
 		if err != nil {
 			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))

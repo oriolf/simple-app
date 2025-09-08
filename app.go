@@ -50,7 +50,7 @@ func execute(args []string, commands ...Command) {
 	}
 	options := fmt.Sprintf(" Choose one of: %s\n", strings.Join(commandNames, ", "))
 	if len(args) < 1 {
-		log.Fatalf("Unspecified command." + options)
+		log.Fatalln("Unspecified command." + options)
 	}
 
 	for _, c := range commands {
