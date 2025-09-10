@@ -7,12 +7,12 @@ import (
 )
 
 type Member struct {
-	ID       uint      `json:"id"`
-	Name     string    `json:"name"`
-	NIF      string    `json:"nif"`
-	JoinedOn app.Date  `json:"joined_on"`
-	LeftOn   *app.Date `json:"left_on"`
-	IBAN     *string   `json:"iban"`
+	ID       uint
+	Name     string
+	NIF      string
+	JoinedOn app.Date
+	LeftOn   *app.Date
+	IBAN     *string
 }
 
 func MemberFactory() *Member { return &Member{} }
@@ -21,13 +21,20 @@ func MemberFactory() *Member { return &Member{} }
 
 func (m *Member) SetID(id uint) { m.ID = id }
 
-func (m Member) Validate() app.ApiErrors {
-	return app.Validate(
-		app.ValidateStringNonEmpty("name", m.Name),
-		app.ValidateSpanishDNI("nif", m.NIF),
-		app.ValidateDate("joined_on", m.JoinedOn),
-		// app.ValidateIBAN("iban", m.IBAN),
-	)
+func (m *Member) Validate(params map[string]any) app.ApiErrors {
+	var errors []app.ApiErrors
+	m.Name, errors = app.ValidateStringNonEmpty(errors, params, "name")
+	m.NIF, errors = app.ValidateSpanishDNI(errors, params, "nif")
+	m.JoinedOn, errors = app.ValidateDate(errors, params, "joined_on")
+	// app.ValidateIBAN("iban", m.IBAN),
+
+	return app.Validate(errors...)
+}
+
+func (m Member) ValidationTranslations() map[string]string {
+	return map[string]string{
+		"UNIQUE constraint failed: members.nif": "Ja existeix un soci amb aquest DNI",
+	}
 }
 
 func (m Member) Add(tx *sql.Tx) (uint, error) {

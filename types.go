@@ -59,7 +59,8 @@ func (d *Date) FromString(s string) error {
 type ApiErrors = map[string][]string
 
 type Validator interface {
-	Validate() ApiErrors
+	Validate(map[string]any) ApiErrors
+	ValidationTranslations() map[string]string
 }
 
 type Adder interface {

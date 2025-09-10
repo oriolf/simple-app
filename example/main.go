@@ -9,18 +9,18 @@ import (
 )
 
 type User struct {
-	ID       uint   `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"-"`
-	Salt     string `json:"-"`
+	ID       uint
+	Email    string
+	Password string
+	Salt     string
 }
 
 type MembershipFee struct {
-	ID       uint      `json:"id"`
-	MemberID uint      `json:"-"`
-	Year     uint      `json:"year"`
-	PaidOn   time.Time `json:"paid_on"`
-	Quantity uint      `json:"quantity"` // quantity in EUR cents
+	ID       uint
+	MemberID uint
+	Year     uint
+	PaidOn   time.Time
+	Quantity uint // quantity in EUR cents
 }
 
 //go:embed migrations

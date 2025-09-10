@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -85,13 +86,14 @@ func FixedJsonResponse(res any) func(Request) Response {
 func HTTPAdd[T Adder](seed func() T) func(Request) Response {
 	return func(r Request) Response {
 		decoder := json.NewDecoder(r.r.Body)
-		a := seed()
-		if err := decoder.Decode(&a); err != nil {
+		var params map[string]any
+		if err := decoder.Decode(&params); err != nil {
 			r.Log("Could not decode data: %s", err)
-			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada"))
+			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", nil))
 		}
 
-		if errors := a.Validate(); len(errors) > 0 {
+		a := seed()
+		if errors := a.Validate(params); len(errors) > 0 {
 			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors))
 		}
 
@@ -101,7 +103,7 @@ func HTTPAdd[T Adder](seed func() T) func(Request) Response {
 			return err
 		}
 		if err := transaction(db, f); err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
+			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), a.ValidationTranslations()))
 		}
 
 		return r.jsonResponse(http.StatusOK, map[string]any{"id": id})
@@ -112,23 +114,24 @@ func HTTPUpdate[T Updater](seed func() T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		if err != nil {
-			return r.jsonResponse(http.StatusBadRequest, formError(err.Error()))
+			return r.jsonResponse(http.StatusBadRequest, formError(err.Error(), nil))
 		}
 
 		decoder := json.NewDecoder(r.r.Body)
-		a := seed()
-		if err := decoder.Decode(&a); err != nil {
+		var params map[string]any
+		if err := decoder.Decode(&params); err != nil {
 			r.Log("Could not decode data: %s", err)
-			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada"))
+			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", nil))
 		}
 
+		a := seed()
 		a.SetID(uint(id))
-		if errors := a.Validate(); len(errors) > 0 {
+		if errors := a.Validate(params); len(errors) > 0 {
 			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors))
 		}
 
 		if err := transaction(db, a.Update); err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
+			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), a.ValidationTranslations()))
 		}
 
 		return r.jsonResponse(http.StatusOK, map[string]any{})
@@ -139,12 +142,12 @@ func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		if err != nil {
-			return r.jsonResponse(http.StatusBadRequest, formError(err.Error()))
+			return r.jsonResponse(http.StatusBadRequest, formError(err.Error(), nil))
 		}
 
 		a, err := seed.Get(db, uint(id))
 		if err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
+			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), nil))
 		}
 
 		return r.jsonResponse(http.StatusOK, a)
@@ -155,7 +158,7 @@ func HTTPList[T Lister[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		items, total, err := seed.List(db, NewPaginator(r.r))
 		if err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error()))
+			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), nil))
 		}
 
 		return r.jsonResponse(http.StatusOK, map[string]any{
@@ -183,7 +186,15 @@ func internalServerErrorJsonResponse() Response {
 	}
 }
 
-func formError(msg string) map[string]ApiErrors {
+func formError(msg string, translations map[string]string) map[string]ApiErrors {
+	if translations != nil {
+		for k, v := range translations {
+			if strings.Contains(msg, k) {
+				msg = v
+				break
+			}
+		}
+	}
 	return jsonErrors(ApiErrors{"__form__": []string{msg}})
 }
 
