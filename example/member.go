@@ -38,19 +38,19 @@ func (m Member) ValidationTranslations() map[string]string {
 }
 
 func (m Member) Add(tx *sql.Tx) (uint, error) {
-	return app.Add(tx, m)
+	return app.DBAdd(tx, m)
 }
 
 func (m Member) Update(tx *sql.Tx) error {
-	return app.Update(tx, m)
+	return app.DBUpdate(tx, m)
 }
 
 func (m Member) Get(db *sql.DB, id uint) (Member, error) {
-	return app.Get(db, m, id)
+	return app.DBGet(db, m, id)
 }
 
 func (m Member) List(db *sql.DB, paginator app.Paginator) (members []Member, total uint, err error) {
-	return app.List(db, m, paginator)
+	return app.DBList(db, m, paginator)
 }
 
 // SQL methods

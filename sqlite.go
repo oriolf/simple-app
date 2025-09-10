@@ -119,7 +119,7 @@ func QueryDB[T any](db *sql.DB, scanFunc func(rows *sql.Rows) (T, error), stmt s
 	return res, nil
 }
 
-func Add[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
+func DBAdd[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
 	res, err := m.SQLInsert(tx)
 	if err != nil {
 		return 0, fmt.Errorf("could not insert: %w", err)
@@ -131,14 +131,14 @@ func Add[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
 	return uint(id), nil
 }
 
-func Update[T SQLUpdater](tx *sql.Tx, m T) error {
+func DBUpdate[T SQLUpdater](tx *sql.Tx, m T) error {
 	if err := m.SQLUpdate(tx); err != nil {
 		return fmt.Errorf("could not update: %w", err)
 	}
 	return nil
 }
 
-func Get[T SQLGetter[T]](db *sql.DB, m T, id uint) (T, error) {
+func DBGet[T SQLGetter[T]](db *sql.DB, m T, id uint) (T, error) {
 	items, err := QueryDB(db, m.Scan, m.SelectSQL()+" WHERE id=?;", id)
 	if err != nil {
 		return m, fmt.Errorf("could not select: %w", err)
@@ -149,7 +149,7 @@ func Get[T SQLGetter[T]](db *sql.DB, m T, id uint) (T, error) {
 	return items[0], nil
 }
 
-func List[T SQLLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, total uint, err error) {
+func DBList[T SQLLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, total uint, err error) {
 	row := db.QueryRow(m.CountSQL())
 	if err := row.Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("could not count: %w", err)
