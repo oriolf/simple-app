@@ -1,38 +1,30 @@
+// TODO add automatic created_at, updated_at, deleted_at fields to models, if possible at the database level
 package main
 
 import (
 	"embed"
 	"log"
-	"time"
+	"net/http"
 
 	app "github.com/oriolf/simple-app"
 )
 
-type User struct {
-	ID       uint
-	Email    string
-	Password string
-	Salt     string
-}
-
-type MembershipFee struct {
-	ID       uint
-	MemberID uint
-	Year     uint
-	PaidOn   time.Time
-	Quantity uint // quantity in EUR cents
-}
-
 //go:embed migrations
 var migrationFiles embed.FS
 
+//go:embed static
+var staticFiles embed.FS
+
+//go:embed templates
+var templateFiles embed.FS
+
 func main() {
-	if err := app.Init(app.InitSQL(migrationFiles)); err != nil {
+	if err := app.Init(app.InitSQL(migrationFiles), app.InitTemplates(templateFiles)); err != nil {
 		log.Fatalln("Could not initialize app:", err)
 	}
 
 	app.Execute(
-		app.Command{Name: "http", Handler: http},
+		app.Command{Name: "http", Handler: httpHandlers},
 		app.Command{
 			Name: "user",
 			Commands: []app.Command{
@@ -42,16 +34,19 @@ func main() {
 	)
 }
 
-func http() {
-	app.HandleHTTP("GET /ok", app.FixedJsonResponse(map[string]bool{"ok": true}))
-
+func httpHandlers() {
 	// TODO make them authentication required
-	app.HandleHTTP("GET /members", app.HTTPList(Member{}))
-	app.HandleHTTP("GET /members/{id}", app.HTTPGet(Member{}))
-	app.HandleHTTP("POST /members", app.HTTPAdd(MemberFactory))
-	app.HandleHTTP("PUT /members/{id}", app.HTTPUpdate(MemberFactory))
-	app.HandleHTTP("DELETE /members/{id}", app.HTTPDelete(Member{}))
-	// app.HandleHTTP("PATCH /members/{id}", app.HTTPPatch(MemberFactory))
+	app.HandleHTTP("GET /api/members", app.HTTPList(Member{}))
+	app.HandleHTTP("GET /api/members/{id}", app.HTTPGet(Member{}))
+	app.HandleHTTP("POST /api/members", app.HTTPAdd(MemberFactory))
+	app.HandleHTTP("PUT /api/members/{id}", app.HTTPUpdate(MemberFactory))
+	app.HandleHTTP("DELETE /api/members/{id}", app.HTTPDelete(Member{}))
+	// app.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(MemberFactory))
+
+	app.HandleHTTP("GET /index.html", app.HTTPTemplate("index.html"))
+
+	app.HandleHTTP("GET /ok", app.FixedJsonResponse(map[string]bool{"ok": true}))
+	http.Handle("/", http.FileServerFS(staticFiles))
 
 	log.Fatalln(app.ServeHTTP())
 }

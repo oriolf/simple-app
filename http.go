@@ -3,12 +3,16 @@ package app
 import (
 	"bytes"
 	"database/sql"
+	"embed"
 	"encoding/json"
+	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -30,6 +34,13 @@ type JsonResponse struct {
 }
 
 func (r JsonResponse) Status() int { return r.status }
+
+type TemplateResponse struct {
+	status int
+	io.Reader
+}
+
+func (r TemplateResponse) Status() int { return r.status }
 
 var requestId uint64
 
@@ -80,6 +91,16 @@ func HandleHTTP(url string, handler func(Request) Response) {
 func FixedJsonResponse(res any) func(Request) Response {
 	return func(r Request) Response {
 		return r.jsonResponse(http.StatusOK, res)
+	}
+}
+
+// TODO the template implementation is very limited: it only allows for one
+// level of inheritance, everyone must inherit from layout.html, and there is
+// no optionn to pass arguments to the template; but it works!
+func HTTPTemplate(filename string) func(Request) Response {
+	return func(r Request) Response {
+		tmpl := getTemplate(filename)
+		return r.templateResponse(tmpl)
 	}
 }
 
@@ -184,6 +205,17 @@ func HTTPList[T Lister[T]](seed T) func(Request) Response {
 	}
 }
 
+func (r Request) templateResponse(tmpl *template.Template) TemplateResponse {
+	reader, writer := io.Pipe()
+	go func() {
+		if err := tmpl.ExecuteTemplate(writer, "layout.html", nil); err != nil {
+			r.Log("Could not execute template: %s", err)
+		}
+		writer.Close()
+	}()
+	return TemplateResponse{status: http.StatusOK, Reader: reader}
+}
+
 func (r Request) jsonResponse(status int, value any) JsonResponse {
 	reader, writer := io.Pipe()
 	go func() {
@@ -216,4 +248,36 @@ func formError(msg string, translations map[string]string) map[string]ApiErrors 
 
 func jsonErrors(errors ApiErrors) map[string]ApiErrors {
 	return map[string]ApiErrors{"errors": errors}
+}
+
+var (
+	TEMPLATES      = make(map[string]*template.Template)
+	TEMPLATES_LOCK sync.Mutex
+)
+
+func getTemplate(filename string) *template.Template {
+	TEMPLATES_LOCK.Lock()
+	defer TEMPLATES_LOCK.Unlock()
+	return TEMPLATES[filename]
+}
+
+func initTemplates(templateFiles embed.FS) error {
+	TEMPLATES_LOCK.Lock()
+	defer TEMPLATES_LOCK.Unlock()
+
+	files, err := templateFiles.ReadDir("templates")
+	if err != nil {
+		return fmt.Errorf("could not read dir: %w", err)
+	}
+
+	for _, f := range files {
+		name := f.Name()
+		tmpl, err := template.ParseFS(templateFiles, "templates/layout.html", "templates/"+name)
+		if err != nil {
+			return fmt.Errorf("could not parse template %s: %w", name, err)
+		}
+		TEMPLATES[name] = tmpl
+	}
+
+	return nil
 }

@@ -1,3 +1,5 @@
+// TODO static files from go-sqlite-http-template
+// TODO template files from borses.git
 package app
 
 import (
@@ -27,6 +29,15 @@ func InitSQL(migrationFiles embed.FS) Option {
 	return func() (err error) {
 		if db, err = initSQL(migrationFiles); err != nil {
 			return fmt.Errorf("could not initialize sql: %w", err)
+		}
+		return nil
+	}
+}
+
+func InitTemplates(templateFiles embed.FS) Option {
+	return func() error {
+		if err := initTemplates(templateFiles); err != nil {
+			return fmt.Errorf("could not initialize templates: %w", err)
 		}
 		return nil
 	}

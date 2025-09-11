@@ -7,6 +7,7 @@ function dev {
     while [[ true ]]
     do
         chsum2=`find .. -type f -mtime -1 -not -path '../.git/*' -not -path '*.swp' -not -path '../example/example' -not -path '../example/db.db' -exec md5sum {} \;`
+        pidof example > /dev/null || __restart
         if [[ $chsum1 != $chsum2 ]]; then
             __restart
             chsum1=$chsum2
@@ -15,10 +16,30 @@ function dev {
     done
 }
 
+function test-e2e {
+    rm -f db.db
+    killall example || true
+    echo "Testing..."
+    url="http://localhost:8080"
+    __wait_restart "$url/ok"
+    __check 001 "$url/api/members"
+    __check 002 -X POST -d '{"name": "Pepe", "nif": "00000000T", "joined_on": "2000-01-01"}' "$url/api/members"
+}
+
 function __restart {
     killall example || true
     go build
     ./example http & 
+}
+
+function __wait_restart {
+    curl $1 > /dev/null 2>&1 || __wait_restart $1
+}
+
+function __check {
+    echo "Step $1"
+    curl -s "${@:2}" > "got/$1.json"
+    diff <(jq --sort-keys . "expected/$1.json") <(jq --sort-keys . "got/$1.json")
 }
 
 function help {
