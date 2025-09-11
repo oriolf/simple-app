@@ -74,6 +74,10 @@ type Updater interface {
 	Validator
 }
 
+type Deleter interface {
+	Delete(*sql.Tx, uint) error
+}
+
 type Getter[T any] interface {
 	Get(*sql.DB, uint) (T, error)
 }

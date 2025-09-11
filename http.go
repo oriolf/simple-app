@@ -138,6 +138,22 @@ func HTTPUpdate[T Updater](seed func() T) func(Request) Response {
 	}
 }
 
+func HTTPDelete[T Deleter](seed T) func(Request) Response {
+	return func(r Request) Response {
+		id, err := strconv.Atoi(r.r.PathValue("id"))
+		if err != nil {
+			return r.jsonResponse(http.StatusBadRequest, formError(err.Error(), nil))
+		}
+
+		f := func(tx *sql.Tx) (err error) { return seed.Delete(tx, uint(id)) }
+		if err := transaction(db, f); err != nil {
+			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), nil))
+		}
+
+		return r.jsonResponse(http.StatusOK, map[string]any{})
+	}
+}
+
 func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))

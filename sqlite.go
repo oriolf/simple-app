@@ -131,13 +131,6 @@ func DBAdd[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
 	return uint(id), nil
 }
 
-func DBUpdate[T SQLUpdater](tx *sql.Tx, m T) error {
-	if err := m.SQLUpdate(tx); err != nil {
-		return fmt.Errorf("could not update: %w", err)
-	}
-	return nil
-}
-
 func DBGet[T SQLGetter[T]](db *sql.DB, m T, id uint) (T, error) {
 	items, err := QueryDB(db, m.Scan, m.SelectSQL()+" WHERE id=?;", id)
 	if err != nil {

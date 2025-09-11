@@ -42,7 +42,11 @@ func (m Member) Add(tx *sql.Tx) (uint, error) {
 }
 
 func (m Member) Update(tx *sql.Tx) error {
-	return app.DBUpdate(tx, m)
+	return m.SQLUpdate(tx)
+}
+
+func (m Member) Delete(tx *sql.Tx, id uint) error {
+	return m.SQLDelete(tx, id)
 }
 
 func (m Member) Get(db *sql.DB, id uint) (Member, error) {
@@ -62,6 +66,11 @@ func (m Member) SQLInsert(tx *sql.Tx) (sql.Result, error) {
 func (m Member) SQLUpdate(tx *sql.Tx) error {
 	_, err := tx.Exec("UPDATE members SET name=?, nif=?, joined_on=? WHERE id=?;",
 		m.Name, m.NIF, m.JoinedOn, m.ID)
+	return err
+}
+
+func (m Member) SQLDelete(tx *sql.Tx, id uint) error {
+	_, err := tx.Exec("DELETE FROM members WHERE id=?;", id)
 	return err
 }
 
