@@ -21,7 +21,7 @@ function test-e2e {
     killall example || true
     echo "Testing..."
     url="http://localhost:8080"
-    __wait_restart "$url/ok"
+    __wait_restart "$url/api/ok"
     __check 001 "$url/api/members"
     __check 002 -X POST -d '{"name": "Pepe", "nif": "00000000T", "joined_on": "2000-01-01"}' "$url/api/members"
 }

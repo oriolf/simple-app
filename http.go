@@ -95,12 +95,26 @@ func FixedJsonResponse(res any) func(Request) Response {
 }
 
 // TODO the template implementation is very limited: it only allows for one
-// level of inheritance, everyone must inherit from layout.html, and there is
-// no optionn to pass arguments to the template; but it works!
+// level of inheritance, everyone must inherit from layout.html
 func HTTPTemplate(filename string) func(Request) Response {
 	return func(r Request) Response {
 		tmpl := getTemplate(filename)
-		return r.templateResponse(tmpl)
+		return r.templateResponse(tmpl, nil)
+	}
+}
+
+func HTTPTemplateList[T Lister[T]](filename string, seed T) func(Request) Response {
+	return func(r Request) Response {
+		tmpl := getTemplate(filename)
+		paginator := NewPaginator(r.r)
+		items, total, err := seed.List(db, paginator)
+		if err != nil {
+			// TODO consider a nicer error.html page, with the error code, some message maybe
+			// TODO consider also moving the error page to the simple-app code
+			tmpl := getTemplate("error.html")
+			return r.templateResponse(tmpl, nil)
+		}
+		return r.templateResponse(tmpl, map[string]any{"items": items, "total": total, "paginator": paginator})
 	}
 }
 
@@ -205,10 +219,10 @@ func HTTPList[T Lister[T]](seed T) func(Request) Response {
 	}
 }
 
-func (r Request) templateResponse(tmpl *template.Template) TemplateResponse {
+func (r Request) templateResponse(tmpl *template.Template, data any) TemplateResponse {
 	reader, writer := io.Pipe()
 	go func() {
-		if err := tmpl.ExecuteTemplate(writer, "layout.html", nil); err != nil {
+		if err := tmpl.ExecuteTemplate(writer, "layout.html", data); err != nil {
 			r.Log("Could not execute template: %s", err)
 		}
 		writer.Close()

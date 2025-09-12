@@ -35,6 +35,9 @@ func main() {
 }
 
 func httpHandlers() {
+	// API
+	app.HandleHTTP("GET /api/ok", app.FixedJsonResponse(map[string]bool{"ok": true}))
+
 	// TODO make them authentication required
 	app.HandleHTTP("GET /api/members", app.HTTPList(Member{}))
 	app.HandleHTTP("GET /api/members/{id}", app.HTTPGet(Member{}))
@@ -43,10 +46,10 @@ func httpHandlers() {
 	app.HandleHTTP("DELETE /api/members/{id}", app.HTTPDelete(Member{}))
 	// app.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(MemberFactory))
 
-	app.HandleHTTP("GET /index.html", app.HTTPTemplate("index.html"))
+	// HTML
+	app.HandleHTTP("GET /{$}", app.HTTPTemplateList("index.html", Member{}))
 
-	app.HandleHTTP("GET /ok", app.FixedJsonResponse(map[string]bool{"ok": true}))
-	http.Handle("/", http.FileServerFS(staticFiles))
-
+	// Static
+	http.Handle("/static/", http.FileServerFS(staticFiles))
 	log.Fatalln(app.ServeHTTP())
 }

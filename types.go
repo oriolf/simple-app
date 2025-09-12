@@ -89,19 +89,17 @@ type Lister[T any] interface {
 type Paginator interface {
 	Limit() uint
 	Offset() uint
+	Page() uint
+	ItemsPerPage() uint
+	HasPrevious() bool
+	Previous() uint
+	HasNext(uint) bool
+	Next() uint
 }
 
 type paginator struct {
 	page         uint
 	itemsPerPage uint
-}
-
-func (p paginator) Limit() uint {
-	return p.itemsPerPage
-}
-
-func (p paginator) Offset() uint {
-	return (p.page - 1) * p.itemsPerPage
 }
 
 func NewPaginator(r *http.Request) paginator {
@@ -115,6 +113,15 @@ func NewPaginator(r *http.Request) paginator {
 	}
 	return paginator{page: uint(page), itemsPerPage: uint(itemsPerPage)}
 }
+
+func (p paginator) Limit() uint             { return p.itemsPerPage }
+func (p paginator) Offset() uint            { return (p.page - 1) * p.itemsPerPage }
+func (p paginator) Page() uint              { return p.page }
+func (p paginator) ItemsPerPage() uint      { return p.itemsPerPage }
+func (p paginator) HasPrevious() bool       { return p.page > 1 }
+func (p paginator) Previous() uint          { return p.page - 1 }
+func (p paginator) HasNext(total uint) bool { return total > p.page*p.itemsPerPage }
+func (p paginator) Next() uint              { return p.page + 1 }
 
 type Scanner[T any] interface {
 	Scan(*sql.Rows) (T, error)
