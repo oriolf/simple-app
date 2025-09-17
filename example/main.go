@@ -1,4 +1,3 @@
-// TODO add automatic created_at, updated_at, deleted_at fields to models, if possible at the database level
 package main
 
 import (
@@ -25,12 +24,9 @@ func main() {
 
 	app.Execute(
 		app.Command{Name: "http", Handler: httpHandlers},
-		app.Command{
-			Name: "user",
-			Commands: []app.Command{
-				{Name: "add", Handler: app.CLIAdd(MemberFactory)},
-			},
-		},
+		app.Command{Name: "user", Commands: []app.Command{
+			{Name: "add", Handler: app.CLIAdd(MemberFactory)},
+		}},
 	)
 }
 
@@ -47,6 +43,7 @@ func httpHandlers() {
 	// app.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(MemberFactory))
 
 	// HTML
+	// TODO implement basic members functionality (list, add, delete, patch with HTMX)
 	app.HandleHTTP("GET /{$}", app.HTTPTemplateList("index.html", Member{}))
 
 	// Static

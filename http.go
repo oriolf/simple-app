@@ -114,6 +114,7 @@ func HTTPTemplateList[T Lister[T]](filename string, seed T) func(Request) Respon
 			tmpl := getTemplate("error.html")
 			return r.templateResponse(tmpl, nil)
 		}
+		paginator.SetTotal(total)
 		return r.templateResponse(tmpl, map[string]any{"items": items, "total": total, "paginator": paginator})
 	}
 }

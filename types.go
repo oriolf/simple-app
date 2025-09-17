@@ -93,16 +93,20 @@ type Paginator interface {
 	ItemsPerPage() uint
 	HasPrevious() bool
 	Previous() uint
-	HasNext(uint) bool
+	HasNext() bool
 	Next() uint
+	Shown() uint
+	Total() uint
+	SetTotal(uint)
 }
 
 type paginator struct {
 	page         uint
 	itemsPerPage uint
+	total        uint
 }
 
-func NewPaginator(r *http.Request) paginator {
+func NewPaginator(r *http.Request) *paginator {
 	page, _ := strconv.Atoi(r.FormValue("page"))
 	itemsPerPage, _ := strconv.Atoi(r.FormValue("itemsPerPage"))
 	if page <= 0 {
@@ -111,17 +115,31 @@ func NewPaginator(r *http.Request) paginator {
 	if itemsPerPage <= 0 {
 		itemsPerPage = 10
 	}
-	return paginator{page: uint(page), itemsPerPage: uint(itemsPerPage)}
+	return &paginator{page: uint(page), itemsPerPage: uint(itemsPerPage)}
 }
 
-func (p paginator) Limit() uint             { return p.itemsPerPage }
-func (p paginator) Offset() uint            { return (p.page - 1) * p.itemsPerPage }
-func (p paginator) Page() uint              { return p.page }
-func (p paginator) ItemsPerPage() uint      { return p.itemsPerPage }
-func (p paginator) HasPrevious() bool       { return p.page > 1 }
-func (p paginator) Previous() uint          { return p.page - 1 }
-func (p paginator) HasNext(total uint) bool { return total > p.page*p.itemsPerPage }
-func (p paginator) Next() uint              { return p.page + 1 }
+func (p *paginator) SetTotal(total uint) { p.total = total }
+
+func (p paginator) Limit() uint        { return p.itemsPerPage }
+func (p paginator) Offset() uint       { return (p.page - 1) * p.itemsPerPage }
+func (p paginator) Page() uint         { return p.page }
+func (p paginator) ItemsPerPage() uint { return p.itemsPerPage }
+func (p paginator) HasPrevious() bool  { return p.page > 1 }
+func (p paginator) Previous() uint     { return p.page - 1 }
+func (p paginator) HasNext() bool      { return p.total > p.page*p.itemsPerPage }
+func (p paginator) Next() uint         { return p.page + 1 }
+func (p paginator) Total() uint        { return p.total }
+func (p paginator) Shown() uint {
+	previous := p.itemsPerPage * (p.page - 1)
+	if previous > p.total {
+		return 0
+	}
+	shown := p.total - previous
+	if shown > p.itemsPerPage {
+		return p.itemsPerPage
+	}
+	return shown
+}
 
 type Scanner[T any] interface {
 	Scan(*sql.Rows) (T, error)

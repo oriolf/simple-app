@@ -9,22 +9,20 @@
       <th>Elimina</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody hx-confirm="Segur que el vols esborrar?" hx-target="closest tr" hx-swap="delete swap:1s">
   {{ range .items }}
     <tr>
       <td>{{ .Name }}</td>
       <td>{{ .NIF }}</td>
       <td>{{ .JoinedOn }}</td>
-      <td>-</td>
+      <td>
+        <button hx-delete="/api/members/{{ .ID }}">
+          Esborra
+        </button>
+      </td>
     </tr>
   {{ end }}
   </tbody>
 </table>
-{{ if .paginator.HasPrevious }}
-<a href="?itemsPerPage={{ .paginator.ItemsPerPage }}&page={{ .paginator.Previous }}">«</a>
-{{ end }}
-Mostrant {{ .paginator.ItemsPerPage }} de {{ .total }}
-{{ if .paginator.HasNext .total }}
-<a href="?itemsPerPage={{ .paginator.ItemsPerPage }}&page={{ .paginator.Next }}">»</a>
-{{ end }}
+{{ template "pagination" .paginator }}
 {{ end }}

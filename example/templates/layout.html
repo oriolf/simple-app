@@ -5,12 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
     <link rel="stylesheet" href="static/new.min.css">
+    <script src="static/htmx.min.js"></script>
     <title>Go APP example</title>
+<style>
+.center { text-align: center; }
+tr.htmx-swapping td {
+  opacity: 0;
+  transition: opacity 1s ease-out;
+}
+</style>
   </head>
-  <body>
+  <body hx-boost="true">
     <main class="container">
       {{ template "content" . }}
     </main>
   </body>
 </html>
 {{ define "content" }}{{ end }}
+
+{{ define "pagination" }}
+<div class="center">
+  {{ if .HasPrevious }}
+  <a href="?itemsPerPage={{ .ItemsPerPage }}&page={{ .Previous }}">«</a>
+  {{ end }}
+  Pàgina {{ .Page }} (mostrant {{ .Shown }} de {{ .Total }})
+  {{ if .HasNext }}
+  <a href="?itemsPerPage={{ .ItemsPerPage }}&page={{ .Next }}">»</a>
+  {{ end }}
+</div>
+{{ end }}
