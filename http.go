@@ -174,6 +174,51 @@ func HTTPUpdate[T Updater](seed func() T) func(Request) Response {
 	}
 }
 
+func HTTPPatch[T Patcher](seed T) func(Request) Response {
+	return func(r Request) Response {
+		id, err := strconv.Atoi(r.r.PathValue("id"))
+		if err != nil {
+			return r.jsonResponse(http.StatusBadRequest, formError(err.Error(), nil))
+		}
+
+		decoder := json.NewDecoder(r.r.Body)
+		var params map[string]any
+		if err := decoder.Decode(&params); err != nil {
+			r.Log("Could not decode data: %s", err)
+			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", nil))
+		}
+
+		if len(params) == 0 {
+			return r.jsonResponse(http.StatusBadRequest, formError("Cal indicar el camp que es vol actualitzar", nil))
+		}
+
+		if len(params) > 1 {
+			return r.jsonResponse(http.StatusBadRequest, formError("Només es pot actualitzar un camp per petició", nil))
+		}
+
+		var key string
+		var value any
+		for k, v := range params {
+			key = k
+			value = v
+		}
+
+		field, value, errors := seed.ValidatePatch(key, value)
+		if len(errors) > 0 {
+			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors))
+		}
+
+		f := func(tx *sql.Tx) error {
+			return seed.Patch(tx, uint(id), field, value)
+		}
+		if err := transaction(db, f); err != nil {
+			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), seed.ValidationTranslations()))
+		}
+
+		return r.jsonResponse(http.StatusOK, map[string]any{})
+	}
+}
+
 func HTTPDelete[T Deleter](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))

@@ -40,7 +40,7 @@ func httpHandlers() {
 	app.HandleHTTP("POST /api/members", app.HTTPAdd(MemberFactory))
 	app.HandleHTTP("PUT /api/members/{id}", app.HTTPUpdate(MemberFactory))
 	app.HandleHTTP("DELETE /api/members/{id}", app.HTTPDelete(Member{}))
-	// app.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(MemberFactory))
+	app.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(Member{}))
 
 	// HTML
 	// TODO implement basic members functionality (list, add, delete, patch with HTMX)

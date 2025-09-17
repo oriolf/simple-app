@@ -58,9 +58,18 @@ func (d *Date) FromString(s string) error {
 
 type ApiErrors = map[string][]string
 
+type ValidationTranslator interface {
+	ValidationTranslations() map[string]string
+}
+
 type Validator interface {
 	Validate(map[string]any) ApiErrors
-	ValidationTranslations() map[string]string
+	ValidationTranslator
+}
+
+type PatchValidator interface {
+	ValidatePatch(string, any) (string, any, ApiErrors)
+	ValidationTranslator
 }
 
 type Adder interface {
@@ -72,6 +81,11 @@ type Updater interface {
 	SetID(uint)
 	Update(*sql.Tx) error
 	Validator
+}
+
+type Patcher interface {
+	Patch(*sql.Tx, uint, string, any) error
+	PatchValidator
 }
 
 type Deleter interface {

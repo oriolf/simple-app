@@ -2,17 +2,18 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 
 	app "github.com/oriolf/simple-app"
 )
 
 type Member struct {
-	ID       uint
-	Name     string
-	NIF      string
-	JoinedOn app.Date
-	LeftOn   *app.Date
-	IBAN     *string
+	ID       uint      `json:"id"`
+	Name     string    `json:"name"`
+	NIF      string    `json:"nif"`
+	JoinedOn app.Date  `json:"joined_on"`
+	LeftOn   *app.Date `json:"left_on"`
+	IBAN     *string   `json:"iban"`
 }
 
 func MemberFactory() *Member { return &Member{} }
@@ -31,6 +32,24 @@ func (m *Member) Validate(params map[string]any) app.ApiErrors {
 	return app.Validate(errors...)
 }
 
+func (m Member) ValidatePatch(field string, value any) (string, any, app.ApiErrors) {
+	params := map[string]any{field: value}
+	var res any
+	var errors []app.ApiErrors
+	switch field {
+	case "name":
+		res, errors = app.ValidateStringNonEmpty(nil, params, field)
+	case "nif":
+		res, errors = app.ValidateSpanishDNI(nil, params, field)
+	case "joined_on":
+		res, errors = app.ValidateDate(nil, params, field)
+	default:
+		return field, value, app.ApiErrors{field: []string{"Camp desconegut"}}
+	}
+
+	return field, res, app.Validate(errors...)
+}
+
 func (m Member) ValidationTranslations() map[string]string {
 	return map[string]string{
 		"UNIQUE constraint failed: members.nif": "Ja existeix un soci amb aquest DNI",
@@ -47,6 +66,10 @@ func (m Member) Update(tx *sql.Tx) error {
 
 func (m Member) Delete(tx *sql.Tx, id uint) error {
 	return m.SQLDelete(tx, id)
+}
+
+func (m Member) Patch(tx *sql.Tx, id uint, field string, value any) error {
+	return m.SQLPatch(tx, id, field, value)
 }
 
 func (m Member) Get(db *sql.DB, id uint) (Member, error) {
@@ -71,6 +94,12 @@ func (m Member) SQLUpdate(tx *sql.Tx) error {
 
 func (m Member) SQLDelete(tx *sql.Tx, id uint) error {
 	_, err := tx.Exec("DELETE FROM members WHERE id=?;", id)
+	return err
+}
+
+func (m Member) SQLPatch(tx *sql.Tx, id uint, field string, value any) error {
+	sql := fmt.Sprintf("UPDATE members SET %s=? WHERE id=?;", field)
+	_, err := tx.Exec(sql, value, id)
 	return err
 }
 
