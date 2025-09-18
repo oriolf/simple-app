@@ -20,6 +20,7 @@ import (
 type Request struct {
 	id      uint
 	r       *http.Request
+	w       http.ResponseWriter
 	started time.Time
 }
 
@@ -44,9 +45,9 @@ func (r TemplateResponse) Status() int { return r.status }
 
 var requestId uint64
 
-func NewRequest(r *http.Request) Request {
+func NewRequest(r *http.Request, w http.ResponseWriter) Request {
 	id := atomic.AddUint64(&requestId, 1)
-	return Request{id: uint(id), r: r, started: time.Now()}
+	return Request{id: uint(id), r: r, w: w, started: time.Now()}
 }
 
 func (r Request) took() time.Duration {
@@ -66,7 +67,7 @@ func ServeHTTP() error {
 
 func HandleHTTP(url string, handler func(Request) Response) {
 	http.HandleFunc(url, func(w http.ResponseWriter, request *http.Request) {
-		r := NewRequest(request)
+		r := NewRequest(request, w)
 		r.Log("[%s] %s", request.Method, request.URL.Path)
 
 		res := handler(r)
@@ -308,6 +309,28 @@ func formError(msg string, translations map[string]string) map[string]ApiErrors 
 
 func jsonErrors(errors ApiErrors) map[string]ApiErrors {
 	return map[string]ApiErrors{"errors": errors}
+}
+
+func HXRefresh(handler func(Request) Response) func(Request) Response {
+	return func(r Request) Response {
+		res := handler(r)
+		if res.Status() == http.StatusOK {
+			r.w.Header().Set("HX-Refresh", "true")
+		}
+
+		return res
+	}
+}
+
+func HXTriggerAfterSwap(handler func(Request) Response, event string) func(Request) Response {
+	return func(r Request) Response {
+		res := handler(r)
+		if res.Status() == http.StatusOK {
+			r.w.Header().Set("HX-Trigger-After-Swap", event)
+		}
+
+		return res
+	}
 }
 
 var (

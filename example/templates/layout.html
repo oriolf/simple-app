@@ -6,6 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <link rel="stylesheet" href="static/new.min.css">
     <script src="static/htmx.min.js"></script>
+    <script src="static/json-enc.js"></script>
     <title>Go APP example</title>
 <style>
 .center { text-align: center; }
@@ -16,7 +17,7 @@ tr.htmx-swapping td {
 </style>
   </head>
   <body hx-boost="true">
-    <main class="container">
+    <main id="content" class="container">
       {{ template "content" . }}
     </main>
   </body>

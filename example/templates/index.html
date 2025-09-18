@@ -1,28 +1,36 @@
 {{ define "content" }}
-<h1>Socis</h1>
-<table>
-  <thead>
-    <tr>
-      <th>Nom</th>
-      <th>DNI</th>
-      <th>Soci des de</th>
-      <th>Elimina</th>
-    </tr>
-  </thead>
-  <tbody hx-confirm="Segur que el vols esborrar?" hx-target="closest tr" hx-swap="delete swap:1s">
-  {{ range .items }}
-    <tr>
-      <td>{{ .Name }}</td>
-      <td>{{ .NIF }}</td>
-      <td>{{ .JoinedOn }}</td>
-      <td>
-        <button hx-delete="/api/members/{{ .ID }}">
-          Esborra
-        </button>
-      </td>
-    </tr>
-  {{ end }}
-  </tbody>
-</table>
-{{ template "pagination" .paginator }}
+<div hx-get="/" hx-trigger="members-updated from:body" hx-target="#content" hx-swap="outerHTML">
+  <h1>Socis</h1>
+  <form hx-post="/members" hx-ext="json-enc" hx-swap="none">
+    <input type="text" name="name" required>
+    <input type="text" name="nif" required>
+    <input type="date" name="joined_on" required>
+    <input type="submit" value="Afegeix">
+  </form>
+  <table>
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>DNI</th>
+        <th>Soci des de</th>
+        <th>Elimina</th>
+      </tr>
+    </thead>
+    <tbody hx-confirm="Segur que el vols esborrar?" hx-target="closest tr" hx-swap="delete swap:1s">
+    {{ range .items }}
+      <tr>
+        <td>{{ .Name }}</td>
+        <td>{{ .NIF }}</td>
+        <td>{{ .JoinedOn }}</td>
+        <td>
+          <button hx-delete="/members/{{ .ID }}">
+            Esborra
+          </button>
+        </td>
+      </tr>
+    {{ end }}
+    </tbody>
+  </table>
+  {{ template "pagination" .paginator }}
+</div>
 {{ end }}

@@ -45,6 +45,8 @@ func httpHandlers() {
 	// HTML
 	// TODO implement basic members functionality (list, add, delete, patch with HTMX)
 	app.HandleHTTP("GET /{$}", app.HTTPTemplateList("index.html", Member{}))
+	app.HandleHTTP("DELETE /members/{id}", app.HXTriggerAfterSwap(app.HTTPDelete(Member{}), "members-updated"))
+	app.HandleHTTP("POST /members", app.HXTriggerAfterSwap(app.HTTPAdd(MemberFactory), "members-updated"))
 
 	// Static
 	http.Handle("/static/", http.FileServerFS(staticFiles))
