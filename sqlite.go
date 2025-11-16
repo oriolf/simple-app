@@ -10,7 +10,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// TODO time should be datetime in UTC, not timestamp, that is harder to read.
+func DB() *sql.DB {
+	return db
+}
+
 func initSQL(migrationFiles embed.FS) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "db.db")
 	if err != nil {
@@ -20,7 +23,7 @@ func initSQL(migrationFiles embed.FS) (*sql.DB, error) {
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS migrations (
         id   INTEGER NOT NULL PRIMARY KEY,
         name TEXT NOT NULL,
-        time TIMESTAMP NOT NULL
+        time TEXT NOT NULL
     );`)
 	if err != nil {
 		db.Close()
@@ -65,7 +68,7 @@ func migrateFile(db *sql.DB, filename, contents string) error {
 				return fmt.Errorf("could not execute migration: %w", err)
 			}
 
-			if _, err := db.Exec("INSERT INTO migrations (name, time) VALUES (?, ?);", filename, time.Now().Unix()); err != nil {
+			if _, err := db.Exec("INSERT INTO migrations (name, time) VALUES (?, ?);", filename, time.Now().Format(time.RFC3339)); err != nil {
 				return fmt.Errorf("could not set migration as executed: %w", err)
 			}
 		}
@@ -108,6 +111,7 @@ func QueryDB[T any](db *sql.DB, scanFunc func(rows *sql.Rows) (T, error), stmt s
 		if err != nil {
 			return nil, fmt.Errorf("error scaning row %d: %w", i, err)
 		}
+
 		res = append(res, x)
 		i += 1
 	}
@@ -117,6 +121,56 @@ func QueryDB[T any](db *sql.DB, scanFunc func(rows *sql.Rows) (T, error), stmt s
 	}
 
 	return res, nil
+}
+
+func QueryJoinDB[T SQLJoinMerger[T]](
+	db *sql.DB,
+	scanFunc func(rows *sql.Rows) (T, error),
+	stmt string,
+	args ...any,
+) ([]T, error) {
+	rows, err := db.Query(stmt, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+
+	res := make(map[uint]T)
+	orders := make(map[uint]int)
+	rowIndex, modelIndex := 0, 0
+	for rows.Next() {
+		x, err := scanFunc(rows)
+		if err != nil {
+			return nil, fmt.Errorf("error scaning row %d: %w", rowIndex, err)
+		}
+
+		id := x.GetID()
+		previous, ok := res[id]
+		if ok {
+			res[id] = previous.Merge(x)
+		} else {
+			res[id] = x
+			orders[id] = modelIndex
+			modelIndex++
+		}
+
+		rowIndex++
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("final error in rows: %w", err)
+	}
+
+	var list []T
+	for _, m := range res {
+		list = append(list, m)
+	}
+
+	sort.Slice(list, func(i, j int) bool {
+		return orders[list[i].GetID()] < orders[list[j].GetID()]
+	})
+
+	return list, nil
 }
 
 func DBAdd[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
@@ -155,6 +209,28 @@ func DBList[T SQLLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, to
 		items, err = QueryDB(db, m.Scan, sql, limit, offset)
 	} else {
 		items, err = QueryDB(db, m.Scan, sql+";")
+	}
+
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not select: %w", err)
+	}
+
+	return items, total, nil
+}
+
+func DBListJoin[T SQLJoinLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, total uint, err error) {
+	row := db.QueryRow(m.CountSQL())
+	if err := row.Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("could not count: %w", err)
+	}
+
+	sql := m.SelectSQL() + m.OrderSQL()
+	if paginator != nil {
+		sql = sql + "LIMIT ? OFFSET ?;"
+		limit, offset := paginator.Limit(), paginator.Offset()
+		items, err = QueryJoinDB(db, m.Scan, sql, limit, offset)
+	} else {
+		items, err = QueryJoinDB(db, m.Scan, sql+";")
 	}
 
 	if err != nil {

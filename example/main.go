@@ -4,6 +4,7 @@ import (
 	"embed"
 	"log"
 	"net/http"
+	"strconv"
 
 	app "github.com/oriolf/simple-app"
 )
@@ -42,13 +43,32 @@ func httpHandlers() {
 	app.HandleHTTP("DELETE /api/members/{id}", app.HTTPDelete(Member{}))
 	app.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(Member{}))
 
-	// HTML
-	// TODO implement basic members functionality (list, add, delete, patch with HTMX)
+	// HTML + HTMX
 	app.HandleHTTP("GET /{$}", app.HTTPTemplateList("index.html", Member{}))
 	app.HandleHTTP("DELETE /members/{id}", app.HXTriggerAfterSwap(app.HTTPDelete(Member{}), "members-updated"))
 	app.HandleHTTP("POST /members", app.HXTriggerAfterSwap(app.HTTPAdd(MemberFactory), "members-updated"))
+	app.HandleHTTP("GET /members/{id}/patch-field/{field}", HTTPMemberGetEditField)
 
 	// Static
 	http.Handle("/static/", http.FileServerFS(staticFiles))
 	log.Fatalln(app.ServeHTTP())
+}
+
+func HTTPMemberGetEditField(r app.Request) app.Response {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		return r.TemplateError()
+	}
+
+	field := r.PathValue("field")
+	if !app.InSlice(field, []string{"name", "nif", "joined_on"}) {
+		return r.TemplateError()
+	}
+
+	member, err := app.DBGet(r.DB, Member{}, uint(id))
+	if err != nil {
+		return r.TemplateError()
+	}
+
+	return r.TemplateResponse("member_edit_field.html", map[string]any{"field": field, "member": member})
 }

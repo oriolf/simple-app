@@ -16,14 +16,19 @@
         <th>Elimina</th>
       </tr>
     </thead>
-    <tbody hx-confirm="Segur que el vols esborrar?" hx-target="closest tr" hx-swap="delete swap:1s">
+    <tbody>
     {{ range .items }}
       <tr>
-        <td>{{ .Name }}</td>
+        <td>{{ template "member_table_field" dict "field" "name" "value" .Name "id" .ID }}</td>
         <td>{{ .NIF }}</td>
         <td>{{ .JoinedOn }}</td>
         <td>
-          <button hx-delete="/members/{{ .ID }}">
+          <button
+            hx-delete="/members/{{ .ID }}"
+            hx-confirm="Segur que el vols esborrar?"
+            hx-target="closest tr"
+            hx-swap="delete swap:1s"
+          >
             Esborra
           </button>
         </td>

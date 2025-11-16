@@ -1,3 +1,4 @@
+{{ define "all" }}
 <!doctype html>
 <html lang="en">
   <head>
@@ -22,6 +23,8 @@ tr.htmx-swapping td {
     </main>
   </body>
 </html>
+{{ end }}
+
 {{ define "content" }}{{ end }}
 
 {{ define "pagination" }}
@@ -35,3 +38,22 @@ tr.htmx-swapping td {
   {{ end }}
 </div>
 {{ end }}
+
+{{ define "member_table_field" }}
+<span id="member-patch-{{ .field }}-{{ .id }}" hx-get="/members/{{ .id }}/patch-field/{{ .field }}" hx-swap="outerHTML">
+  {{ .value }}
+</span>
+{{ end }}
+
+{{ define "member_edit_field" }}
+<span
+  id="member-patch-{{ .field }}-{{ .member.ID }}"
+  hx-patch="/members/{{ .member.ID }}"
+  hx-swap="outerHTML"
+  hx-trigger="keyup[key=='Enter']"
+>
+  <input type="text" name="{{ .field }}" value="{{ .member.Name }}">
+</span>
+{{ end }}
+
+{{ template "all" . }}

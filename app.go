@@ -39,9 +39,13 @@ func InitSQL(migrationFiles embed.FS) Option {
 	}
 }
 
-func InitTemplates(templateFiles embed.FS) Option {
+func InitTemplates(templateFiles embed.FS, templateFuncs ...map[string]any) Option {
 	return func() error {
-		if err := initTemplates(templateFiles); err != nil {
+		funcs := map[string]any{}
+		if templateFuncs != nil {
+			funcs = templateFuncs[0]
+		}
+		if err := initTemplates(templateFiles, funcs); err != nil {
 			return fmt.Errorf("could not initialize templates: %w", err)
 		}
 		return nil
@@ -62,6 +66,11 @@ func Execute(commands ...Command) {
 }
 
 func execute(args []string, commands ...Command) {
+	if len(commands) == 1 && len(args) == 0 && commands[0].Name == "" {
+		commands[0].Handler()
+		return
+	}
+
 	var commandNames []string
 	for _, c := range commands {
 		commandNames = append(commandNames, c.Name)

@@ -20,12 +20,12 @@ func TestValidateStringNonEmpty(t *testing.T) {
 		{input: "a", expectedString: "a"},
 		{input: " a  ", expectedString: "a"},
 	} {
-		params := map[string]any{"": tc.input}
-		got, errors := ValidateStringNonEmpty(nil, params, "")
+		v := NewValidator(map[string]any{"": tc.input})
+		got := v.ValidateStringNonEmpty("")
 		if got != tc.expectedString {
 			t.Errorf("[%d] Expected result «%s», got «%s»", i, tc.expectedString, got)
 		}
-		checkValidationErrors(t, i, tc.expectedError, errors...)
+		checkValidationErrors(t, i, tc.expectedError, v.Errors())
 	}
 }
 
@@ -45,12 +45,12 @@ func TestValidateDate(t *testing.T) {
 		{input: "2000-02-29", expectedDate: Date{2000, 2, 29}},
 		{input: "2000-01-01", expectedDate: Date{2000, 1, 1}},
 	} {
-		params := map[string]any{"": tc.input}
-		got, errors := ValidateDate(nil, params, "")
+		v := NewValidator(map[string]any{"": tc.input})
+		got := v.ValidateDate("")
 		if got != tc.expectedDate {
 			t.Errorf("[%d] Expected result «%#v», got «%#v»", i, tc.expectedDate, got)
 		}
-		checkValidationErrors(t, i, tc.expectedError, errors...)
+		checkValidationErrors(t, i, tc.expectedError, v.Errors())
 	}
 }
 
@@ -63,25 +63,25 @@ func TestValidateSpanishDNI(t *testing.T) {
 		{input: "00000000A", expectedString: "00000000A", expectedError: "La lletra del DNI no és correcta, o algun dígit no és correcte"},
 		{input: "00000000T", expectedString: "00000000T"},
 	} {
-		params := map[string]any{"": tc.input}
-		got, errors := ValidateSpanishDNI(nil, params, "")
+		v := NewValidator(map[string]any{"": tc.input})
+		got := v.ValidateSpanishDNI("")
 		if got != tc.expectedString {
 			t.Errorf("[%d] Expected result «%s», got «%s»", i, tc.expectedString, got)
 		}
-		checkValidationErrors(t, i, tc.expectedError, errors...)
+		checkValidationErrors(t, i, tc.expectedError, v.Errors())
 	}
 }
 
-func checkValidationErrors(t *testing.T, i int, expected string, errors ...ApiErrors) {
+func checkValidationErrors(t *testing.T, i int, expected string, errors ApiErrors) {
 	if expected == "" {
-		if errors != nil {
-			t.Errorf("[%d] Expected no error, but got %v", i, errors[0][""])
+		if len(errors) > 0 {
+			t.Errorf("[%d] Expected no error, but got %v", i, errors[""])
 		}
 	} else if expected != "" {
-		if errors == nil {
+		if len(errors) == 0 {
 			t.Errorf("[%d] Expected error %s, but got no error", i, expected)
 		} else {
-			errs := errors[0][""]
+			errs := errors[""]
 			if len(errs) != 1 {
 				t.Errorf("[%d] Expected one error, but got %d: %v", i, len(errs), errs)
 			} else if errs[0] != expected {

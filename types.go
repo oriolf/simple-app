@@ -56,6 +56,52 @@ func (d *Date) FromString(s string) error {
 	return err
 }
 
+type DateTime struct {
+	time.Time
+}
+
+func Now() DateTime { return DateTime{time.Now()} }
+
+func (d DateTime) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, d.String())), nil
+}
+
+func (d *DateTime) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if err := d.FromString(s); err != nil {
+		return fmt.Errorf("could not scan date time: %w", err)
+	}
+
+	return nil
+}
+
+func (d DateTime) Value() (driver.Value, error) {
+	return d.String(), nil
+}
+
+func (d *DateTime) Scan(value any) error {
+	if value == nil {
+		return fmt.Errorf("must receive a non-null string")
+	}
+	switch value := value.(type) {
+	case string:
+		return d.FromString(value)
+	case []byte:
+		return d.FromString(string(value))
+	}
+
+	return fmt.Errorf("must receive a string")
+}
+
+func (d DateTime) String() string {
+	return d.Format(time.RFC3339)
+}
+
+func (d *DateTime) FromString(s string) (err error) {
+	d.Time, err = time.Parse(time.RFC3339, s)
+	return err
+}
+
 type ApiErrors = map[string][]string
 
 type ValidationTranslator interface {
@@ -64,12 +110,10 @@ type ValidationTranslator interface {
 
 type Validator interface {
 	Validate(map[string]any) ApiErrors
-	ValidationTranslator
 }
 
 type PatchValidator interface {
 	ValidatePatch(string, any) (string, any, ApiErrors)
-	ValidationTranslator
 }
 
 type Adder interface {
@@ -189,6 +233,16 @@ type SQLLister[T any] interface {
 	SQLSelecter
 	SQLCounter
 	SQLOrderer
+}
+
+type SQLJoinMerger[T any] interface {
+	GetID() uint
+	Merge(T) T
+}
+
+type SQLJoinLister[T any] interface {
+	SQLLister[T]
+	SQLJoinMerger[T]
 }
 
 type Option func() error
