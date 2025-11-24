@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -25,13 +26,16 @@ func main() {
 
 	app.Execute(
 		app.Command{Name: "http", Handler: httpHandlers},
-		app.Command{Name: "user", Commands: []app.Command{
+		app.Command{Name: "member", Commands: []app.Command{
 			{Name: "add", Handler: app.CLIAdd(MemberFactory)},
 		}},
+		//app.Command{Name: "user", Commands: []app.Command{
+		//	{Name: "add", Handler: app.AddSuperUser},
+		//}},
 	)
 }
 
-func httpHandlers() {
+func httpHandlers([]string) []string {
 	// API
 	app.HandleHTTP("GET /api/ok", app.FixedJsonResponse(map[string]bool{"ok": true}))
 
@@ -51,24 +55,24 @@ func httpHandlers() {
 
 	// Static
 	http.Handle("/static/", http.FileServerFS(staticFiles))
-	log.Fatalln(app.ServeHTTP())
+	return []string{app.ServeHTTP().Error()}
 }
 
 func HTTPMemberGetEditField(r app.Request) app.Response {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		return r.TemplateError()
+		return r.TemplateError(err)
 	}
 
 	field := r.PathValue("field")
 	if !app.InSlice(field, []string{"name", "nif", "joined_on"}) {
-		return r.TemplateError()
+		return r.TemplateError(fmt.Errorf("Unknown field"))
 	}
 
 	member, err := app.DBGet(r.DB, Member{}, uint(id))
 	if err != nil {
-		return r.TemplateError()
+		return r.TemplateError(err)
 	}
 
-	return r.TemplateResponse("member_edit_field.html", map[string]any{"field": field, "member": member})
+	return r.TemplateResponse("member_edit_field.html", map[string]any{"field": field, "member": member}, nil)
 }

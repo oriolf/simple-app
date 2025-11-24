@@ -5,14 +5,14 @@ import (
 	"embed"
 	"fmt"
 	"sort"
-	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func DB() *sql.DB {
-	return db
-}
+//go:embed migrations
+var simpleMigrations embed.FS
+
+func DB() *sql.DB { return db }
 
 func initSQL(migrationFiles embed.FS) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "db.db")
@@ -20,47 +20,55 @@ func initSQL(migrationFiles embed.FS) (*sql.DB, error) {
 		return nil, fmt.Errorf("could not open db: %w", err)
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS migrations (
-        id   INTEGER NOT NULL PRIMARY KEY,
-        name TEXT NOT NULL,
-        time TEXT NOT NULL
-    );`)
-	if err != nil {
+	if err := migrateFiles(db, "simple", simpleMigrations); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("could not create migrations table: %w", err)
+		return nil, fmt.Errorf("could not migrate simple files: %w", err)
 	}
 
+	if err := migrateFiles(db, "app", migrationFiles); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("could not migrate app files: %w", err)
+	}
+
+	return db, nil
+}
+
+func migrateFiles(db *sql.DB, app string, migrationFiles embed.FS) error {
 	const folder = "migrations"
 	files, err := migrationFiles.ReadDir(folder)
 	if err != nil {
-		db.Close()
-		return nil, fmt.Errorf("could not read migration files: %w", err)
+		return fmt.Errorf("could not read migration files: %w", err)
 	}
 
 	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
 	for _, file := range files {
 		b, err := migrationFiles.ReadFile(folder + "/" + file.Name())
 		if err != nil {
-			db.Close()
-			return nil, fmt.Errorf("could not read migration file %s: %w", file.Name(), err)
+			return fmt.Errorf("could not read migration file %s: %w", file.Name(), err)
 		}
 
-		err = migrateFile(db, file.Name(), string(b))
+		err = migrateFile(db, app, file.Name(), string(b))
 		if err != nil {
-			db.Close()
-			return nil, fmt.Errorf("could not execute migration file %s: %w", file.Name(), err)
+			return fmt.Errorf("could not execute migration file %s: %w", file.Name(), err)
 		}
 	}
 
-	return db, nil
+	return nil
 }
 
-func migrateFile(db *sql.DB, filename, contents string) error {
+func migrateFile(db *sql.DB, app, filename, contents string) error {
 	return transaction(db, func(tx *sql.Tx) error {
 		var count int
-		err := db.QueryRow("SELECT COUNT(1) FROM migrations WHERE name=?;", filename).Scan(&count)
+		err := db.QueryRow("SELECT COUNT(1) FROM sqlite_master WHERE name='migrations';").Scan(&count)
 		if err != nil {
-			return fmt.Errorf("could not check if previous migration existed: %w", err)
+			return fmt.Errorf("could not check if migrations table exists: %w", err)
+		}
+
+		if count > 0 {
+			err := db.QueryRow("SELECT COUNT(1) FROM migrations WHERE app=? AND name=?;", app, filename).Scan(&count)
+			if err != nil {
+				return fmt.Errorf("could not check if previous migration exists: %w", err)
+			}
 		}
 
 		if count == 0 {
@@ -68,7 +76,7 @@ func migrateFile(db *sql.DB, filename, contents string) error {
 				return fmt.Errorf("could not execute migration: %w", err)
 			}
 
-			if _, err := db.Exec("INSERT INTO migrations (name, time) VALUES (?, ?);", filename, time.Now().Format(time.RFC3339)); err != nil {
+			if _, err := db.Exec("INSERT INTO migrations (app, name, time) VALUES (?, ?, ?);", app, filename, Now()); err != nil {
 				return fmt.Errorf("could not set migration as executed: %w", err)
 			}
 		}

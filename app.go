@@ -67,7 +67,7 @@ func Execute(commands ...Command) {
 
 func execute(args []string, commands ...Command) {
 	if len(commands) == 1 && len(args) == 0 && commands[0].Name == "" {
-		commands[0].Handler()
+		executeHandler(nil, commands[0])
 		return
 	}
 
@@ -83,7 +83,7 @@ func execute(args []string, commands ...Command) {
 	for _, c := range commands {
 		if args[0] == c.Name {
 			if c.Handler != nil {
-				c.Handler()
+				executeHandler(args[1:], c)
 				return
 			} else {
 				execute(args[1:], c.Commands...)
@@ -93,6 +93,12 @@ func execute(args []string, commands ...Command) {
 	}
 
 	log.Fatalf("Unknown command «%s»."+options, args[0])
+}
+
+func executeHandler(args []string, c Command) {
+	for _, msg := range c.Handler(args) {
+		fmt.Println(msg)
+	}
 }
 
 func initTelegram(token string, chat int64) (*telegram.BotAPI, error) {

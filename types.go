@@ -249,6 +249,6 @@ type Option func() error
 
 type Command struct {
 	Name     string
-	Handler  func()
+	Handler  func([]string) []string
 	Commands []Command
 }

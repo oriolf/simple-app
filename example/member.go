@@ -23,31 +23,30 @@ func MemberFactory() *Member { return &Member{} }
 func (m *Member) SetID(id uint) { m.ID = id }
 
 func (m *Member) Validate(params map[string]any) app.ApiErrors {
-	var errors []app.ApiErrors
-	m.Name, errors = app.ValidateStringNonEmpty(errors, params, "name")
-	m.NIF, errors = app.ValidateSpanishDNI(errors, params, "nif")
-	m.JoinedOn, errors = app.ValidateDate(errors, params, "joined_on")
+	v := app.NewValidator(params)
+	m.Name = v.ValidateStringNonEmpty("name")
+	m.NIF = v.ValidateSpanishDNI("nif")
+	m.JoinedOn = v.ValidateDate("joined_on")
 	// app.ValidateIBAN("iban", m.IBAN),
 
-	return app.Validate(errors...)
+	return v.Errors()
 }
 
 func (m Member) ValidatePatch(field string, value any) (string, any, app.ApiErrors) {
-	params := map[string]any{field: value}
 	var res any
-	var errors []app.ApiErrors
+	v := app.NewValidator(map[string]any{field: value})
 	switch field {
 	case "name":
-		res, errors = app.ValidateStringNonEmpty(nil, params, field)
+		res = v.ValidateStringNonEmpty(field)
 	case "nif":
-		res, errors = app.ValidateSpanishDNI(nil, params, field)
+		res = v.ValidateSpanishDNI(field)
 	case "joined_on":
-		res, errors = app.ValidateDate(nil, params, field)
+		res = v.ValidateDate(field)
 	default:
 		return field, value, app.ApiErrors{field: []string{"Camp desconegut"}}
 	}
 
-	return field, res, app.Validate(errors...)
+	return field, res, v.Errors()
 }
 
 func (m Member) ValidationTranslations() map[string]string {
