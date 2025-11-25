@@ -7,9 +7,6 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"log"
-	"os"
-	"strings"
 
 	telegram "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -54,56 +51,12 @@ func InitTemplates(templateFiles embed.FS, templateFuncs ...map[string]any) Opti
 
 func InitTelegram(token string, chat int64) Option {
 	return func() (err error) {
-		if bot, err = initTelegram(token, chat); err != nil {
+		TELEGRAM_CHAT = chat
+		if bot, err = telegram.NewBotAPI(token); err != nil {
 			return fmt.Errorf("could not initialize telegram: %s", err)
 		}
 		return nil
 	}
-}
-
-func Execute(commands ...Command) {
-	execute(os.Args[1:], commands...)
-}
-
-func execute(args []string, commands ...Command) {
-	if len(commands) == 1 && len(args) == 0 && commands[0].Name == "" {
-		executeHandler(nil, commands[0])
-		return
-	}
-
-	var commandNames []string
-	for _, c := range commands {
-		commandNames = append(commandNames, c.Name)
-	}
-	options := fmt.Sprintf(" Choose one of: %s\n", strings.Join(commandNames, ", "))
-	if len(args) < 1 {
-		log.Fatalln("Unspecified command." + options)
-	}
-
-	for _, c := range commands {
-		if args[0] == c.Name {
-			if c.Handler != nil {
-				executeHandler(args[1:], c)
-				return
-			} else {
-				execute(args[1:], c.Commands...)
-				return
-			}
-		}
-	}
-
-	log.Fatalf("Unknown command «%s»."+options, args[0])
-}
-
-func executeHandler(args []string, c Command) {
-	for _, msg := range c.Handler(args) {
-		fmt.Println(msg)
-	}
-}
-
-func initTelegram(token string, chat int64) (*telegram.BotAPI, error) {
-	TELEGRAM_CHAT = chat
-	return telegram.NewBotAPI(token)
 }
 
 func SendTelegram(text string) error {

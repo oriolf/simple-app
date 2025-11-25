@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -416,15 +415,7 @@ func internalServerErrorJsonResponse() Response {
 }
 
 func formError(msg string, t any) map[string]ApiErrors {
-	if v, ok := t.(ValidationTranslator); ok {
-		for k, v := range v.ValidationTranslations() {
-			if strings.Contains(msg, k) {
-				msg = v
-				break
-			}
-		}
-	}
-	return jsonErrors(ApiErrors{"__form__": []string{msg}})
+	return jsonErrors(ApiErrors{"__form__": []string{translateError(msg, t)}})
 }
 
 func jsonErrors(errors ApiErrors) map[string]ApiErrors {

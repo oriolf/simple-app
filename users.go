@@ -1,7 +1,11 @@
 package app
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"database/sql"
 	"database/sql/driver"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 )
@@ -54,7 +58,11 @@ func (r *Roles) Scan(value any) error {
 }
 
 func (r Roles) String() string {
-	b, _ := json.Marshal(r)
+	ss := make([]string, 0, len(r))
+	for _, role := range r {
+		ss = append(ss, string(role))
+	}
+	b, _ := json.Marshal(ss)
 	return string(b)
 }
 
@@ -67,4 +75,48 @@ type Session struct {
 	IP      string   `json:"ip"`
 	Agent   string   `json:"agent"`
 	Expires DateTime `json:"expires"`
+}
+
+var CLIAddSuperUser = CLIAdd(SuperUserFactory)
+
+func SuperUserFactory() *User { return &User{Roles: Roles{RoleSuperUser}} }
+
+func (u *User) Validate(params map[string]any) ApiErrors {
+	v := NewValidator(params)
+	u.Email = v.ValidateEmail("email")
+	u.Password = v.ValidatePassword("password")
+	return v.Errors()
+}
+
+func (u User) Add(tx *sql.Tx) (uint, error) {
+	u.Salt = generateSalt()
+	u.Password = hashPassword(u.Salt, u.Password)
+	return DBAdd(tx, u)
+}
+
+func (u User) SQLInsert(tx *sql.Tx) (sql.Result, error) {
+	return tx.Exec("INSERT INTO users (email, salt, password, roles) VALUES (?, ?, ?, ?);",
+		u.Email, u.Salt, u.Password, u.Roles)
+}
+
+func (u User) ValidationTranslations() map[string]string {
+	return map[string]string{
+		"UNIQUE constraint failed: users.email": "Ja existeix un usuari amb aquest correu electrònic",
+	}
+}
+
+func hashPassword(salt, password string) string {
+	hash := salt + password
+	for i := 0; i < 1000; i++ {
+		hasher := sha256.New()
+		hasher.Write([]byte(hash))
+		hash = hex.EncodeToString(hasher.Sum(nil))
+	}
+	return hash
+}
+
+func generateSalt() string {
+	salt := make([]byte, 32)
+	rand.Read(salt)
+	return hex.EncodeToString(salt)
 }

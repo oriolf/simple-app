@@ -29,9 +29,9 @@ func main() {
 		app.Command{Name: "member", Commands: []app.Command{
 			{Name: "add", Handler: app.CLIAdd(MemberFactory)},
 		}},
-		//app.Command{Name: "user", Commands: []app.Command{
-		//	{Name: "add", Handler: app.AddSuperUser},
-		//}},
+		app.Command{Name: "user", Commands: []app.Command{
+			{Name: "add", Handler: app.CLIAddSuperUser},
+		}},
 	)
 }
 
@@ -40,6 +40,7 @@ func httpHandlers([]string) []string {
 	app.HandleHTTP("GET /api/ok", app.FixedJsonResponse(map[string]bool{"ok": true}))
 
 	// TODO make them authentication required
+	// app.HandleHTTP("POST /api/login", app.Login)
 	app.HandleHTTP("GET /api/members", app.HTTPList(Member{}))
 	app.HandleHTTP("GET /api/members/{id}", app.HTTPGet(Member{}))
 	app.HandleHTTP("POST /api/members", app.HTTPAdd(MemberFactory))

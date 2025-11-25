@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"net/mail"
 	"strconv"
 	"strings"
 	"time"
@@ -98,6 +99,23 @@ func (v *validator) ValidateStringNonEmpty(field string) string {
 		return ""
 	}
 	return value
+}
+
+func (v *validator) ValidatePassword(field string) string {
+	return v.ValidateStringNonEmpty(field)
+}
+
+func (v *validator) ValidateEmail(field string) string {
+	email := v.ValidateStringNonEmpty(field)
+	if v.HasError(field) {
+		return email
+	}
+
+	if _, err := mail.ParseAddress(email); err != nil {
+		v.AddError(field, "L'adreça de correu electrònic no té un format vàlid")
+	}
+
+	return email
 }
 
 func (v *validator) ValidateDate(field string) Date {
