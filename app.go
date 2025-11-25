@@ -1,6 +1,3 @@
-// TODO migrate projects temperatures, borses, monitoring... to validate that
-// the design applies to enough use cases, and check the implementation lines
-// reduction achieved
 package app
 
 import (

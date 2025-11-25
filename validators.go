@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-// TODO create type Validator and make validate calls be like res =
-// validator.ValidateInt(key), avoiding passing errors and params
-
 type validator struct {
 	errors ApiErrors
 	params map[string]any

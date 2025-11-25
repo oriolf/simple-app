@@ -219,6 +219,9 @@ func (r Request) TemplateError(err error) Response {
 	return r.TemplateResponse("error.html", nil, err)
 }
 
+// TODO add a getHttpAuthenticator that checks the login data
+// TODO add user to request data, or maybe rename to context...
+// TODO apply options like in Add, but for everybody, Update, Patch...
 func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Response {
 	return func(r Request) Response {
 		decoder := getHttpDecoder(options...)
