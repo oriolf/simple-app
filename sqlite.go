@@ -204,8 +204,20 @@ func DBGet[T SQLGetter[T]](db *sql.DB, m T, id uint) (T, error) {
 	return items[0], nil
 }
 
+func DBGetBy[T SQLGetter[T]](db *sql.DB, m T, field string, id any) (T, error) {
+	items, err := QueryDB(db, m.Scan, m.SelectSQL()+" WHERE "+field+"=?;", id)
+	if err != nil {
+		return m, fmt.Errorf("could not select: %w", err)
+	}
+	if len(items) == 0 {
+		return m, fmt.Errorf("item not found")
+	}
+	return items[0], nil
+}
+
 func DBList[T SQLLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, total uint, err error) {
-	row := db.QueryRow(m.CountSQL())
+	params := m.SQLParams()
+	row := db.QueryRow(m.CountSQL(), params...)
 	if err := row.Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("could not count: %w", err)
 	}
@@ -214,9 +226,10 @@ func DBList[T SQLLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, to
 	if paginator != nil {
 		sql = sql + "LIMIT ? OFFSET ?;"
 		limit, offset := paginator.Limit(), paginator.Offset()
-		items, err = QueryDB(db, m.Scan, sql, limit, offset)
+		params = append(params, limit, offset)
+		items, err = QueryDB(db, m.Scan, sql, params...)
 	} else {
-		items, err = QueryDB(db, m.Scan, sql+";")
+		items, err = QueryDB(db, m.Scan, sql+";", params...)
 	}
 
 	if err != nil {

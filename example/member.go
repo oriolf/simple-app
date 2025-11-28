@@ -109,11 +109,6 @@ func (Member) Scan(rows *sql.Rows) (m Member, err error) {
 func (Member) SelectSQL() string {
 	return "SELECT id, name, nif, joined_on, left_on, iban FROM members "
 }
-
-func (Member) CountSQL() string {
-	return "SELECT COUNT(1) FROM members;"
-}
-
-func (Member) OrderSQL() string {
-	return "ORDER BY joined_on DESC "
-}
+func (Member) CountSQL() string { return "SELECT COUNT(1) FROM members;" }
+func (Member) OrderSQL() string { return "ORDER BY joined_on DESC " }
+func (Member) SQLParams() []any { return nil }

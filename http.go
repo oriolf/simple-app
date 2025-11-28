@@ -22,6 +22,7 @@ type Request struct {
 	w       http.ResponseWriter
 	started time.Time
 	DB      *sql.DB
+	User    *User
 }
 
 var requestId uint64
@@ -76,80 +77,6 @@ type RedirectResponse struct {
 func (r RedirectResponse) Status() int  { return r.status }
 func (r RedirectResponse) Error() error { return nil }
 
-type httpOption interface {
-	canDecode() bool
-	decode(Request) (map[string]any, error)
-
-	canReturn() bool
-	Return(Request, int, any) Response
-}
-
-type httpBaseOption struct{}
-
-func (o httpBaseOption) canDecode() bool                        { return false }
-func (o httpBaseOption) decode(Request) (map[string]any, error) { return nil, nil }
-func (o httpBaseOption) canReturn() bool                        { return false }
-func (o httpBaseOption) Return(Request, int, any) Response      { return JsonResponse{} }
-
-func FormParams() httpOption {
-	return httpFormDecoder{}
-}
-
-type httpFormDecoder struct {
-	httpBaseOption
-}
-
-func (d httpFormDecoder) canDecode() bool { return true }
-func (d httpFormDecoder) decode(r Request) (map[string]any, error) {
-	if err := r.r.ParseForm(); err != nil {
-		return nil, err
-	}
-
-	params := make(map[string]any)
-	for k, lst := range r.r.Form {
-		if len(lst) > 0 {
-			params[k] = lst[0]
-		}
-	}
-
-	return params, nil
-}
-
-type httpJsonBodyDecoder struct {
-	httpBaseOption
-}
-
-func (d httpJsonBodyDecoder) canDecode() bool { return true }
-func (d httpJsonBodyDecoder) decode(r Request) (params map[string]any, err error) {
-	decoder := json.NewDecoder(r.r.Body)
-	err = decoder.Decode(&params)
-	return params, err
-}
-
-type httpJsonReturner struct {
-	httpBaseOption
-}
-
-func (o httpJsonReturner) canReturn() bool { return true }
-func (o httpJsonReturner) Return(r Request, status int, data any) Response {
-	return r.jsonResponse(status, data, nil)
-}
-
-func Redirect(url string) httpOption {
-	return httpRedirectReturner{URL: url}
-}
-
-type httpRedirectReturner struct {
-	httpBaseOption
-	URL string
-}
-
-func (o httpRedirectReturner) canReturn() bool { return true }
-func (o httpRedirectReturner) Return(r Request, status int, data any) Response {
-	http.Redirect(r.w, r.r, o.URL, http.StatusFound)
-	return RedirectResponse{http.StatusFound, bytes.NewBuffer([]byte{})}
-}
-
 func ServeHTTP() error {
 	defer db.Close()
 	port := ":8080"
@@ -163,14 +90,26 @@ func HTTPStatic(staticFiles embed.FS, filename string) func(http.ResponseWriter,
 	}
 }
 
-func HandleHTTP(url string, handler func(Request) Response) {
+func (g httpGroup) HandleHTTP(url string, handler func(Request) Response) {
+	HandleHTTP(url, handler, g.options...)
+}
+
+func HandleHTTP(url string, handler func(Request) Response, options ...httpOption) {
 	http.HandleFunc(url, func(w http.ResponseWriter, request *http.Request) {
 		r := NewRequest(request, w)
 		r.Log("[%s] %s", request.Method, request.URL.Path)
 
-		res := handler(r)
-		if err := res.Error(); err != nil {
-			r.Log("Got an error: %s", err)
+		var err error
+		var res Response
+		authenticator := getHttpAuthenticator(options...)
+		r.User, err = authenticator(r)
+		if err != nil {
+			r.Log("Got an authentication error: %s", err)
+		} else {
+			res = handler(r)
+			if err := res.Error(); err != nil {
+				r.Log("Got an error: %s", err)
+			}
 		}
 
 		switch res.(type) {
@@ -219,9 +158,44 @@ func (r Request) TemplateError(err error) Response {
 	return r.TemplateResponse("error.html", nil, err)
 }
 
-// TODO add a getHttpAuthenticator that checks the login data
-// TODO add user to request data, or maybe rename to context...
-// TODO apply options like in Add, but for everybody, Update, Patch...
+func Login(r Request) Response {
+	var u User
+	params, err := getHttpDecoder()(r)
+	if err != nil {
+		r.Log("Could not decode data: %s", err)
+		return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", u), err)
+	}
+
+	if errors := u.Validate(params); len(errors) > 0 {
+		return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
+	}
+
+	u, err = DBGetBy(r.DB, u, "email", u.Email)
+	if err != nil {
+		return r.jsonResponse(http.StatusBadRequest, formError("Correu o contrasenya incorrectes", u), nil)
+	}
+
+	providedPassword := hashPassword(u.Salt, params["password"].(string))
+	if providedPassword != u.Password {
+		return r.jsonResponse(http.StatusBadRequest, formError("Correu o contrasenya incorrectes", u), nil)
+	}
+
+	// TODO generate session and set cookie
+
+	return getHttpReturner()(r, http.StatusOK, map[string]any{"ok": true})
+}
+
+func Me(r Request) Response {
+	s := Session{UserID: r.User.ID}
+	sessions, _, err := DBList(r.DB, s, nil)
+	if err != nil {
+		return r.jsonResponse(http.StatusInternalServerError, formError("", s), err)
+	}
+
+	r.User.Sessions = sessions
+	return getHttpReturner()(r, http.StatusOK, r.User)
+}
+
 func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Response {
 	return func(r Request) Response {
 		decoder := getHttpDecoder(options...)
@@ -385,6 +359,15 @@ func getHttpReturner(options ...httpOption) func(Request, int, any) Response {
 		}
 	}
 	return httpJsonReturner{}.Return
+}
+
+func getHttpAuthenticator(options ...httpOption) func(Request) (*User, error) {
+	for _, option := range options {
+		if option.canAuthenticate() {
+			return option.Authenticate
+		}
+	}
+	return httpBaseOption{}.Authenticate
 }
 
 func (r Request) TemplateResponse(templateName string, data any, err error) TemplateResponse {

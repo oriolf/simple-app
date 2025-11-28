@@ -211,12 +211,18 @@ type SQLUpdater interface {
 	SQLUpdate(*sql.Tx) error
 }
 
+type SQLParamer interface {
+	SQLParams() []any
+}
+
 type SQLSelecter interface {
 	SelectSQL() string
+	SQLParamer
 }
 
 type SQLCounter interface {
 	CountSQL() string
+	SQLParamer
 }
 
 type SQLOrderer interface {

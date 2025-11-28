@@ -9,6 +9,7 @@ CREATE TABLE users (
 CREATE TABLE sessions (
     id      TEXT NOT NULL PRIMARY KEY,
     user_id INTEGER NOT NULL,
+    time    TEXT NOT NULL,
     ip      TEXT NOT NULL,
     agent   TEXT NOT NULL,
     expires TEXT NOT NULL

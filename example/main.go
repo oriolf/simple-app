@@ -38,15 +38,16 @@ func main() {
 func httpHandlers([]string) []string {
 	// API
 	app.HandleHTTP("GET /api/ok", app.FixedJsonResponse(map[string]bool{"ok": true}))
+	app.HandleHTTP("POST /api/login", app.Login)
 
-	// TODO make them authentication required
-	// app.HandleHTTP("POST /api/login", app.Login)
-	app.HandleHTTP("GET /api/members", app.HTTPList(Member{}))
-	app.HandleHTTP("GET /api/members/{id}", app.HTTPGet(Member{}))
-	app.HandleHTTP("POST /api/members", app.HTTPAdd(MemberFactory))
-	app.HandleHTTP("PUT /api/members/{id}", app.HTTPUpdate(MemberFactory))
-	app.HandleHTTP("DELETE /api/members/{id}", app.HTTPDelete(Member{}))
-	app.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(Member{}))
+	group := app.HTTPGroup(app.DefaultAuthentication)
+	group.HandleHTTP("GET /api/me", app.Me)
+	group.HandleHTTP("GET /api/members", app.HTTPList(Member{}))
+	group.HandleHTTP("GET /api/members/{id}", app.HTTPGet(Member{}))
+	group.HandleHTTP("POST /api/members", app.HTTPAdd(MemberFactory))
+	group.HandleHTTP("PUT /api/members/{id}", app.HTTPUpdate(MemberFactory))
+	group.HandleHTTP("DELETE /api/members/{id}", app.HTTPDelete(Member{}))
+	group.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(Member{}))
 
 	// HTML + HTMX
 	app.HandleHTTP("GET /{$}", app.HTTPTemplateList("index.html", Member{}))

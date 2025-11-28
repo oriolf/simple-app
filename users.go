@@ -67,14 +67,33 @@ func (r Roles) String() string {
 }
 
 func (r *Roles) FromString(s string) error {
-	return json.Unmarshal([]byte(s), r)
+	var ss []string
+	if err := json.Unmarshal([]byte(s), &ss); err != nil {
+		return err
+	}
+	for _, s := range ss {
+		*r = append(*r, Role(s))
+	}
+	return nil
 }
 
 type Session struct {
 	ID      string   `json:"id"`
+	UserID  uint     `json:"-"`
 	IP      string   `json:"ip"`
 	Agent   string   `json:"agent"`
+	Time    DateTime `json:"time"`
 	Expires DateTime `json:"expires"`
+}
+
+func (Session) SelectSQL() string {
+	return "SELECT id, ip, agent, time, expires FROM sessions WHERE user_id=?;"
+}
+func (Session) CountSQL() string   { return "SELECT COUNT(1) FROM sessions WHERE user_id=?;" }
+func (Session) OrderSQL() string   { return "ORDER BY time ASC " }
+func (s Session) SQLParams() []any { return []any{s.UserID} }
+func (Session) Scan(rows *sql.Rows) (s Session, err error) {
+	return s, rows.Scan(&s.ID, &s.IP, &s.Agent, &s.Time, &s.Expires)
 }
 
 var CLIAddSuperUser = CLIAdd(SuperUserFactory)
@@ -103,6 +122,14 @@ func (u User) ValidationTranslations() map[string]string {
 	return map[string]string{
 		"UNIQUE constraint failed: users.email": "Ja existeix un usuari amb aquest correu electrònic",
 	}
+}
+
+func (User) SelectSQL() string { return "SELECT id, email, salt, password, roles FROM users " }
+func (User) CountSQL() string  { return "SELECT COUNT(1) FROM users;" }
+func (User) OrderSQL() string  { return "ORDER BY email ASC " }
+func (User) SQLParams() []any  { return nil }
+func (User) Scan(rows *sql.Rows) (u User, err error) {
+	return u, rows.Scan(&u.ID, &u.Email, &u.Salt, &u.Password, &u.Roles)
 }
 
 func hashPassword(salt, password string) string {
