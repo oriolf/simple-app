@@ -32,18 +32,15 @@ func NewRequest(r *http.Request, w http.ResponseWriter) Request {
 	return Request{id: uint(id), r: r, w: w, started: time.Now(), DB: db}
 }
 
-func (r Request) took() time.Duration {
-	return time.Since(r.started)
-}
-
 func (r Request) Log(msg string, args ...any) {
 	args = append([]any{r.id}, args...)
 	log.Printf("[%04d] "+msg+"\n", args...)
 }
 
-func (r Request) PathValue(field string) string {
-	return r.r.PathValue(field)
-}
+func (r Request) took() time.Duration           { return time.Since(r.started) }
+func (r Request) PathValue(field string) string { return r.r.PathValue(field) }
+func (r Request) IP() string                    { return r.r.RemoteAddr }
+func (r Request) Agent() string                 { return r.r.UserAgent() }
 
 type Response interface {
 	Status() int
@@ -180,9 +177,33 @@ func Login(r Request) Response {
 		return r.jsonResponse(http.StatusBadRequest, formError("Correu o contrasenya incorrectes", u), nil)
 	}
 
-	// TODO generate session and set cookie
+	// TODO make cookies more secure: https://www.calhoun.io/securing-cookies-in-go
+	s := NewSession(u.ID, r)
+	f := func(tx *sql.Tx) (err error) {
+		_, err = DBAdd(tx, s)
+		return err
+	}
+	if err := transaction(db, f); err != nil {
+		return r.jsonResponse(http.StatusInternalServerError, formError("", u), err)
+	}
+	c := http.Cookie{
+		Name:  "_session",
+		Value: s.ID,
+	}
+	http.SetCookie(r.w, &c)
 
 	return getHttpReturner()(r, http.StatusOK, map[string]any{"ok": true})
+}
+
+func NewSession(userID uint, r Request) Session {
+	return Session{
+		ID:      generateRandomID(),
+		UserID:  userID,
+		Time:    Now(),
+		Expires: Now().Add(30 * 24 * time.Hour),
+		IP:      r.IP(),
+		Agent:   r.Agent(),
+	}
 }
 
 func Me(r Request) Response {

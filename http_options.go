@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -87,10 +88,27 @@ func (o httpRedirectReturner) Return(r Request, status int, data any) Response {
 
 type httpDefaultAuthenticator struct{ httpBaseOption }
 
+var DefaultAuthentication = httpDefaultAuthenticator{}
+
 func (httpDefaultAuthenticator) canAuthenticate() bool { return true }
 func (httpDefaultAuthenticator) Authenticate(r Request) (*User, error) {
-	// TODO read cookie, search session and user in database
-	return nil, nil
+	c, err := r.r.Cookie("_session")
+	if err != nil {
+		return nil, fmt.Errorf("could not get cookie: %w", err)
+	}
+
+	var userID uint
+	err = r.DB.QueryRow("SELECT user_id FROM sessions WHERE id=? AND expires > ?;", c.Value, Now()).Scan(&userID)
+	if err != nil {
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	user, err := DBGet(r.DB, User{}, userID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found: %w", err)
+	}
+
+	return &user, nil
 }
 
 // Grouping

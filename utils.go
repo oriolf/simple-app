@@ -1,6 +1,8 @@
 package app
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"strings"
 	"time"
 )
@@ -71,4 +73,10 @@ func translateError(msg string, t any) string {
 	}
 
 	return msg
+}
+
+func generateRandomID() string {
+	salt := make([]byte, 32)
+	rand.Read(salt)
+	return hex.EncodeToString(salt)
 }

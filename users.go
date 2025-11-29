@@ -1,7 +1,6 @@
 package app
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"database/sql/driver"
@@ -86,8 +85,12 @@ type Session struct {
 	Expires DateTime `json:"expires"`
 }
 
+func (s Session) SQLInsert(tx *sql.Tx) (sql.Result, error) {
+	return tx.Exec("INSERT INTO sessions (id, user_id, time, ip, agent, expires) VALUES (?, ?, ?, ?, ?, ?);",
+		s.ID, s.UserID, s.Time, s.IP, s.Agent, s.Expires)
+}
 func (Session) SelectSQL() string {
-	return "SELECT id, ip, agent, time, expires FROM sessions WHERE user_id=?;"
+	return "SELECT id, ip, agent, time, expires FROM sessions WHERE user_id=? "
 }
 func (Session) CountSQL() string   { return "SELECT COUNT(1) FROM sessions WHERE user_id=?;" }
 func (Session) OrderSQL() string   { return "ORDER BY time ASC " }
@@ -108,7 +111,7 @@ func (u *User) Validate(params map[string]any) ApiErrors {
 }
 
 func (u User) Add(tx *sql.Tx) (uint, error) {
-	u.Salt = generateSalt()
+	u.Salt = generateRandomID()
 	u.Password = hashPassword(u.Salt, u.Password)
 	return DBAdd(tx, u)
 }
@@ -140,10 +143,4 @@ func hashPassword(salt, password string) string {
 		hash = hex.EncodeToString(hasher.Sum(nil))
 	}
 	return hash
-}
-
-func generateSalt() string {
-	salt := make([]byte, 32)
-	rand.Read(salt)
-	return hex.EncodeToString(salt)
 }

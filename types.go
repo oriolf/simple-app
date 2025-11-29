@@ -60,7 +60,8 @@ type DateTime struct {
 	time.Time
 }
 
-func Now() DateTime { return DateTime{time.Now()} }
+func Now() DateTime                              { return DateTime{time.Now()} }
+func (dt DateTime) Add(d time.Duration) DateTime { return DateTime{dt.Time.Add(d)} }
 
 func (d DateTime) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, d.String())), nil
