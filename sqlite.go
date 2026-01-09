@@ -193,8 +193,8 @@ func DBAdd[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
 	return uint(id), nil
 }
 
-func DBGet[T SQLGetter[T]](db *sql.DB, m T, id uint) (T, error) {
-	items, err := QueryDB(db, m.Scan, m.SelectSQL()+" WHERE id=?;", id)
+func DBGet[C any, T SQLGetter[T, C]](db *sql.DB, m T, id uint, criteria C) (T, error) {
+	items, err := QueryDB(db, m.Scan, m.SelectSQL(criteria)+" WHERE id=?;", id)
 	if err != nil {
 		return m, fmt.Errorf("could not select: %w", err)
 	}
@@ -204,8 +204,8 @@ func DBGet[T SQLGetter[T]](db *sql.DB, m T, id uint) (T, error) {
 	return items[0], nil
 }
 
-func DBGetBy[T SQLGetter[T]](db *sql.DB, m T, field string, id any) (T, error) {
-	items, err := QueryDB(db, m.Scan, m.SelectSQL()+" WHERE "+field+"=?;", id)
+func DBGetBy[C any, T SQLGetter[T, C]](db *sql.DB, m T, field string, id any, criteria C) (T, error) {
+	items, err := QueryDB(db, m.Scan, m.SelectSQL(criteria)+" WHERE "+field+"=?;", id)
 	if err != nil {
 		return m, fmt.Errorf("could not select: %w", err)
 	}
@@ -215,14 +215,14 @@ func DBGetBy[T SQLGetter[T]](db *sql.DB, m T, field string, id any) (T, error) {
 	return items[0], nil
 }
 
-func DBList[T SQLLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, total uint, err error) {
-	params := m.SQLParams()
-	row := db.QueryRow(m.CountSQL(), params...)
+func DBList[C any, T SQLLister[T, C]](db *sql.DB, m T, paginator Paginator, criteria C) (items []T, total uint, err error) {
+	params := m.SQLParams(criteria)
+	row := db.QueryRow(m.CountSQL(criteria), params...)
 	if err := row.Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("could not count: %w", err)
 	}
 
-	sql := m.SelectSQL() + m.OrderSQL()
+	sql := m.SelectSQL(criteria) + m.OrderSQL(criteria)
 	if paginator != nil {
 		sql = sql + "LIMIT ? OFFSET ?;"
 		limit, offset := paginator.Limit(), paginator.Offset()
@@ -239,13 +239,13 @@ func DBList[T SQLLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, to
 	return items, total, nil
 }
 
-func DBListJoin[T SQLJoinLister[T]](db *sql.DB, m T, paginator Paginator) (items []T, total uint, err error) {
-	row := db.QueryRow(m.CountSQL())
+func DBListJoin[C any, T SQLJoinLister[T, C]](db *sql.DB, m T, paginator Paginator, criteria C) (items []T, total uint, err error) {
+	row := db.QueryRow(m.CountSQL(criteria))
 	if err := row.Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("could not count: %w", err)
 	}
 
-	sql := m.SelectSQL() + m.OrderSQL()
+	sql := m.SelectSQL(criteria) + m.OrderSQL(criteria)
 	if paginator != nil {
 		sql = sql + "LIMIT ? OFFSET ?;"
 		limit, offset := paginator.Limit(), paginator.Offset()

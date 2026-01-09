@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
 
 	app "github.com/oriolf/simple-app"
 )
@@ -49,7 +50,7 @@ func (m Member) ValidatePatch(field string, value any) (string, any, app.ApiErro
 	return field, res, v.Errors()
 }
 
-func (m Member) ValidationTranslations() map[string]string {
+func (m *Member) ValidationTranslations() map[string]string {
 	return map[string]string{
 		"UNIQUE constraint failed: members.nif": "Ja existeix un soci amb aquest DNI",
 	}
@@ -72,11 +73,26 @@ func (m Member) Patch(tx *sql.Tx, id uint, field string, value any) error {
 }
 
 func (m Member) Get(db *sql.DB, id uint) (Member, error) {
-	return app.DBGet(db, m, id)
+	return app.DBGet(db, m, id, memberFilterCriteria{})
 }
 
-func (m Member) List(db *sql.DB, paginator app.Paginator) (members []Member, total uint, err error) {
-	return app.DBList(db, m, paginator)
+func (m Member) List(
+	db *sql.DB,
+	paginator app.Paginator,
+	criteria memberFilterCriteria,
+) (members []Member, total uint, err error) {
+	return app.DBList(db, m, paginator, criteria)
+}
+
+// HTTP methods
+type memberFilterCriteria struct {
+	search string
+}
+
+func (m Member) FilterCriteria(r *http.Request) memberFilterCriteria {
+	return memberFilterCriteria{
+		search: r.FormValue("search"),
+	}
 }
 
 // SQL methods
@@ -106,9 +122,24 @@ func (Member) Scan(rows *sql.Rows) (m Member, err error) {
 	return m, rows.Scan(&m.ID, &m.Name, &m.NIF, &m.JoinedOn, &m.LeftOn, &m.IBAN)
 }
 
-func (Member) SelectSQL() string {
-	return "SELECT id, name, nif, joined_on, left_on, iban FROM members "
+func (m Member) SelectSQL(criteria memberFilterCriteria) string {
+	return "SELECT id, name, nif, joined_on, left_on, iban FROM members " + m.whereSQL(criteria)
 }
-func (Member) CountSQL() string { return "SELECT COUNT(1) FROM members;" }
-func (Member) OrderSQL() string { return "ORDER BY joined_on DESC " }
-func (Member) SQLParams() []any { return nil }
+func (m Member) CountSQL(criteria memberFilterCriteria) string {
+	return "SELECT COUNT(1) FROM members" + m.whereSQL(criteria) + ";"
+}
+func (Member) whereSQL(criteria memberFilterCriteria) string {
+	if criteria.search != "" {
+		return " WHERE (name LIKE ? OR nif LIKE ?)"
+	}
+	return ""
+}
+
+func (Member) OrderSQL(criteria memberFilterCriteria) string { return "ORDER BY joined_on DESC " }
+func (Member) SQLParams(criteria memberFilterCriteria) []any {
+	if criteria.search != "" {
+		search := "%" + criteria.search + "%"
+		return []any{search, search}
+	}
+	return nil
+}

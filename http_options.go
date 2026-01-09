@@ -103,7 +103,7 @@ func (httpDefaultAuthenticator) Authenticate(r Request) (*User, error) {
 		return nil, fmt.Errorf("session not found: %w", err)
 	}
 
-	user, err := DBGet(r.DB, User{}, userID)
+	user, err := DBGet(r.DB, User{}, userID, struct{}{})
 	if err != nil {
 		return nil, fmt.Errorf("user not found: %w", err)
 	}

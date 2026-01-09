@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -141,8 +143,9 @@ type Getter[T any] interface {
 	Get(*sql.DB, uint) (T, error)
 }
 
-type Lister[T any] interface {
-	List(*sql.DB, Paginator) ([]T, uint, error)
+type Lister[T, C any] interface {
+	List(*sql.DB, Paginator, C) ([]T, uint, error)
+	FilterCriteria(*http.Request) C
 }
 
 type Paginator interface {
@@ -169,7 +172,7 @@ func NewPaginator(r *http.Request) *paginator {
 	page, _ := strconv.Atoi(r.FormValue("page"))
 	itemsPerPage, _ := strconv.Atoi(r.FormValue("itemsPerPage"))
 	if page <= 0 {
-		page = 1
+		page = 0
 	}
 	if itemsPerPage <= 0 {
 		itemsPerPage = 10
@@ -180,16 +183,16 @@ func NewPaginator(r *http.Request) *paginator {
 func (p *paginator) SetTotal(total uint) { p.total = total }
 
 func (p paginator) Limit() uint        { return p.itemsPerPage }
-func (p paginator) Offset() uint       { return (p.page - 1) * p.itemsPerPage }
+func (p paginator) Offset() uint       { return p.page * p.itemsPerPage }
 func (p paginator) Page() uint         { return p.page }
 func (p paginator) ItemsPerPage() uint { return p.itemsPerPage }
-func (p paginator) HasPrevious() bool  { return p.page > 1 }
+func (p paginator) HasPrevious() bool  { return p.page > 0 }
 func (p paginator) Previous() uint     { return p.page - 1 }
-func (p paginator) HasNext() bool      { return p.total > p.page*p.itemsPerPage }
+func (p paginator) HasNext() bool      { return p.total > (p.page+1)*p.itemsPerPage }
 func (p paginator) Next() uint         { return p.page + 1 }
 func (p paginator) Total() uint        { return p.total }
 func (p paginator) Shown() uint {
-	previous := p.itemsPerPage * (p.page - 1)
+	previous := p.itemsPerPage * p.page
 	if previous > p.total {
 		return 0
 	}
@@ -212,34 +215,34 @@ type SQLUpdater interface {
 	SQLUpdate(*sql.Tx) error
 }
 
-type SQLParamer interface {
-	SQLParams() []any
+type SQLParamer[C any] interface {
+	SQLParams(C) []any
 }
 
-type SQLSelecter interface {
-	SelectSQL() string
-	SQLParamer
+type SQLSelecter[C any] interface {
+	SelectSQL(C) string
+	SQLParamer[C]
 }
 
-type SQLCounter interface {
-	CountSQL() string
-	SQLParamer
+type SQLCounter[C any] interface {
+	CountSQL(C) string
+	SQLParamer[C]
 }
 
-type SQLOrderer interface {
-	OrderSQL() string
+type SQLOrderer[C any] interface {
+	OrderSQL(C) string
 }
 
-type SQLGetter[T any] interface {
+type SQLGetter[T, C any] interface {
 	Scanner[T]
-	SQLSelecter
+	SQLSelecter[C]
 }
 
-type SQLLister[T any] interface {
+type SQLLister[T, C any] interface {
 	Scanner[T]
-	SQLSelecter
-	SQLCounter
-	SQLOrderer
+	SQLSelecter[C]
+	SQLCounter[C]
+	SQLOrderer[C]
 }
 
 type SQLJoinMerger[T any] interface {
@@ -247,8 +250,8 @@ type SQLJoinMerger[T any] interface {
 	Merge(T) T
 }
 
-type SQLJoinLister[T any] interface {
-	SQLLister[T]
+type SQLJoinLister[T, C any] interface {
+	SQLLister[T, C]
 	SQLJoinMerger[T]
 }
 
@@ -258,4 +261,49 @@ type Command struct {
 	Name     string
 	Handler  func([]string) []string
 	Commands []Command
+}
+
+func GenerateTypescriptTypes(models ...any) func([]string) []string {
+	return func([]string) []string {
+		for _, model := range models {
+			generateTypescriptTypes(model)
+		}
+		return nil
+	}
+}
+
+func generateTypescriptTypes(model any) {
+	t := reflect.TypeOf(model)
+	s := "export type " + t.Name() + " = {\n"
+	for _, field := range reflect.VisibleFields(t) {
+		if tag := field.Tag.Get("json"); tag != "" && tag != "-" {
+			s += "  " + tag + ": " + getTypescriptType(field.Type) + ";\n"
+		}
+	}
+	s += "}\n"
+
+	ioutil.WriteFile(t.Name()+".ts", []byte(s), 0644)
+}
+
+func getTypescriptType(t reflect.Type) string {
+	if InSlice(t.Name(), []string{"int", "uint", "float64"}) {
+		return "number"
+	}
+	if t.Name() == "string" || t.Kind() == reflect.String {
+		return "string"
+	}
+	if t.Kind() == reflect.Slice {
+		return getTypescriptType(t.Elem()) + "[]"
+	}
+	if t.Kind() == reflect.Pointer {
+		return getTypescriptType(t.Elem()) + "|null"
+	}
+	if t.Kind() == reflect.Struct {
+		// TODO better define date and date time types, compatible with typescript
+		if InSlice(t.Name(), []string{"Date", "DateTime"}) {
+			return "string"
+		}
+		return t.Name()
+	}
+	return "any"
 }

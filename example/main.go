@@ -32,6 +32,9 @@ func main() {
 		app.Command{Name: "user", Commands: []app.Command{
 			{Name: "add", Handler: app.CLIAddSuperUser},
 		}},
+		app.Command{Name: "types", Commands: []app.Command{
+			{Name: "generate", Handler: app.GenerateTypescriptTypes(app.User{}, app.Session{}, Member{})},
+		}},
 	)
 }
 
@@ -71,7 +74,7 @@ func HTTPMemberGetEditField(r app.Request) app.Response {
 		return r.TemplateError(fmt.Errorf("Unknown field"))
 	}
 
-	member, err := app.DBGet(r.DB, Member{}, uint(id))
+	member, err := app.DBGet(r.DB, Member{}, uint(id), memberFilterCriteria{})
 	if err != nil {
 		return r.TemplateError(err)
 	}

@@ -96,12 +96,19 @@ func HandleHTTP(url string, handler func(Request) Response, options ...httpOptio
 		r := NewRequest(request, w)
 		r.Log("[%s] %s", request.Method, request.URL.Path)
 
+		// TODO make it configurable
+		w.Header().Add("Access-Control-Allow-Origin", "http://localhost:5173")
+		w.Header().Add("Access-Control-Allow-Credentials", "true")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		w.Header().Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, PATCH")
+
 		var err error
 		var res Response
 		authenticator := getHttpAuthenticator(options...)
 		r.User, err = authenticator(r)
 		if err != nil {
 			r.Log("Got an authentication error: %s", err)
+			res = r.jsonResponse(http.StatusUnauthorized, formError("", r.User), err)
 		} else {
 			res = handler(r)
 			if err := res.Error(); err != nil {
@@ -139,10 +146,10 @@ func HTTPTemplate(filename string) func(Request) Response {
 	}
 }
 
-func HTTPTemplateList[T Lister[T]](filename string, seed T) func(Request) Response {
+func HTTPTemplateList[C any, T Lister[T, C]](filename string, seed T) func(Request) Response {
 	return func(r Request) Response {
 		paginator := NewPaginator(r.r)
-		items, total, err := seed.List(db, paginator)
+		items, total, err := seed.List(db, paginator, seed.FilterCriteria(r.r))
 		if err != nil {
 			return r.TemplateError(err)
 		}
@@ -167,7 +174,7 @@ func Login(r Request) Response {
 		return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
 	}
 
-	u, err = DBGetBy(r.DB, u, "email", u.Email)
+	u, err = DBGetBy(r.DB, u, "email", u.Email, struct{}{})
 	if err != nil {
 		return r.jsonResponse(http.StatusBadRequest, formError("Correu o contrasenya incorrectes", u), nil)
 	}
@@ -208,7 +215,7 @@ func NewSession(userID uint, r Request) Session {
 
 func Me(r Request) Response {
 	s := Session{UserID: r.User.ID}
-	sessions, _, err := DBList(r.DB, s, nil)
+	sessions, _, err := DBList(r.DB, s, nil, struct{}{})
 	if err != nil {
 		return r.jsonResponse(http.StatusInternalServerError, formError("", s), err)
 	}
@@ -350,9 +357,9 @@ func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 	}
 }
 
-func HTTPList[T Lister[T]](seed T) func(Request) Response {
+func HTTPList[C any, T Lister[T, C]](seed T) func(Request) Response {
 	return func(r Request) Response {
-		items, total, err := seed.List(db, NewPaginator(r.r))
+		items, total, err := seed.List(db, NewPaginator(r.r), seed.FilterCriteria(r.r))
 		if err != nil {
 			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), seed), err)
 		}
