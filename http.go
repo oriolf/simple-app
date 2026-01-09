@@ -75,6 +75,13 @@ func (r RedirectResponse) Status() int  { return r.status }
 func (r RedirectResponse) Error() error { return nil }
 
 func ServeHTTP() error {
+	http.HandleFunc("OPTIONS /", func(w http.ResponseWriter, request *http.Request) {
+		// TODO make it configurable
+		w.Header().Add("Access-Control-Allow-Origin", "http://localhost:5173")
+		w.Header().Add("Access-Control-Allow-Credentials", "true")
+		w.Header().Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, PATCH, QUERY")
+	})
+
 	defer db.Close()
 	port := ":8080"
 	log.Printf("Listening on %s...\n", port)
@@ -100,7 +107,7 @@ func HandleHTTP(url string, handler func(Request) Response, options ...httpOptio
 		w.Header().Add("Access-Control-Allow-Origin", "http://localhost:5173")
 		w.Header().Add("Access-Control-Allow-Credentials", "true")
 		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		w.Header().Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, PATCH")
+		w.Header().Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, PATCH, QUERY")
 
 		var err error
 		var res Response
@@ -222,6 +229,25 @@ func Me(r Request) Response {
 
 	r.User.Sessions = sessions
 	return getHttpReturner()(r, http.StatusOK, r.User)
+}
+
+func DeleteSession(r Request) Response {
+	id := r.r.PathValue("id")
+	var userID uint
+	err := r.DB.QueryRow("SELECT user_id FROM sessions WHERE id=?;", id).Scan(&userID)
+	if err != nil {
+		return r.jsonResponse(http.StatusNotFound, formError(err.Error(), r.User), err)
+	}
+
+	if userID != r.User.ID {
+		return r.jsonResponse(http.StatusNotFound, formError("La sessió no existeix", r.User), nil)
+	}
+
+	if _, err := db.Exec("DELETE FROM sessions WHERE id=?;", id); err != nil {
+		return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), r.User), err)
+	}
+
+	return r.jsonResponse(http.StatusOK, map[string]any{"ok": true}, nil)
 }
 
 func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Response {

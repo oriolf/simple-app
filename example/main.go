@@ -45,6 +45,7 @@ func httpHandlers([]string) []string {
 
 	group := app.HTTPGroup(app.DefaultAuthentication)
 	group.HandleHTTP("GET /api/me", app.Me)
+	group.HandleHTTP("DELETE /api/sessions/{id}", app.DeleteSession)
 	group.HandleHTTP("GET /api/members", app.HTTPList(Member{}))
 	group.HandleHTTP("GET /api/members/{id}", app.HTTPGet(Member{}))
 	group.HandleHTTP("POST /api/members", app.HTTPAdd(MemberFactory))
@@ -59,7 +60,7 @@ func httpHandlers([]string) []string {
 	app.HandleHTTP("GET /members/{id}/patch-field/{field}", HTTPMemberGetEditField)
 
 	// Static
-	http.Handle("/static/", http.FileServerFS(staticFiles))
+	http.Handle("GET /static/", http.FileServerFS(staticFiles))
 	return []string{app.ServeHTTP().Error()}
 }
 
