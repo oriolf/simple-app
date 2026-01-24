@@ -49,6 +49,7 @@ func httpHandlers([]string) []string {
 	group.HandleHTTP("GET /api/members", app.HTTPList(Member{}))
 	group.HandleHTTP("GET /api/members/{id}", app.HTTPGet(Member{}))
 	group.HandleHTTP("POST /api/members", app.HTTPAdd(MemberFactory))
+	group.HandleHTTP("QUERY /api/members", app.HTTPQueryAdd(MemberFactory))
 	group.HandleHTTP("PUT /api/members/{id}", app.HTTPUpdate(MemberFactory))
 	group.HandleHTTP("DELETE /api/members/{id}", app.HTTPDelete(Member{}))
 	group.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(Member{}))

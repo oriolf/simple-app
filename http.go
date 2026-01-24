@@ -278,6 +278,25 @@ func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Respon
 	}
 }
 
+func HTTPQueryAdd[T Adder](seed func() T, options ...httpOption) func(Request) Response {
+	return func(r Request) Response {
+		decoder := getHttpDecoder(options...)
+		params, err := decoder(r)
+		a := seed()
+		if err != nil {
+			r.Log("Could not decode data: %s", err)
+			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", a), err)
+		}
+
+		if errors := a.Validate(params); len(errors) > 0 {
+			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
+		}
+
+		returner := getHttpReturner(options...)
+		return returner(r, http.StatusOK, map[string]any{"ok": true})
+	}
+}
+
 func HTTPUpdate[T Updater](seed func() T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
