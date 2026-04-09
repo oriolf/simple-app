@@ -33,8 +33,8 @@ func CLIAdd[T Adder](seed func() T) func([]string) []string {
 			id, err = a.Add(tx)
 			return err
 		}
-		if err := transaction(db, f); err != nil {
-			return []string{fmt.Sprintf("Could not add from cli: %s", translateError(err.Error(), a))}
+		if err := Transaction(db, f); err != nil {
+			return []string{fmt.Sprintf("Could not add from cli: %s", TranslateError(err.Error(), a))}
 		}
 
 		return []string{fmt.Sprintf("Created user %d", id)}

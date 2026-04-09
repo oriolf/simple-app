@@ -34,7 +34,7 @@ func FormParams() httpOption { return httpFormDecoder{} }
 type httpFormDecoder struct{ httpBaseOption }
 
 func (d httpFormDecoder) canDecode() bool { return true }
-func (d httpFormDecoder) decode(r Request) (map[string]any, error) {
+func (d httpFormDecoder) Decode(r Request) (map[string]any, error) {
 	if err := r.r.ParseForm(); err != nil {
 		return nil, err
 	}
@@ -49,6 +49,8 @@ func (d httpFormDecoder) decode(r Request) (map[string]any, error) {
 	return params, nil
 }
 
+func JsonDecoder() httpOption { return httpJsonBodyDecoder{} }
+
 type httpJsonBodyDecoder struct{ httpBaseOption }
 
 func (d httpJsonBodyDecoder) canDecode() bool { return true }
@@ -60,13 +62,15 @@ func (d httpJsonBodyDecoder) decode(r Request) (params map[string]any, err error
 
 // Output formats and actions
 
+func JsonReturner() httpOption { return httpJsonReturner{} }
+
 type httpJsonReturner struct {
 	httpBaseOption
 }
 
 func (o httpJsonReturner) canReturn() bool { return true }
 func (o httpJsonReturner) Return(r Request, status int, data any) Response {
-	return r.jsonResponse(status, data, nil)
+	return r.JsonResponse(status, data, nil)
 }
 
 func Redirect(url string) httpOption {

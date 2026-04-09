@@ -37,6 +37,15 @@ func (r Request) Log(msg string, args ...any) {
 	log.Printf("[%04d] "+msg+"\n", args...)
 }
 
+func (r Request) DecodeJsonBody(target any) error {
+	decoder := json.NewDecoder(r.r.Body)
+	return decoder.Decode(&target)
+}
+
+func (r Request) JsonBadRequest(msg string, err error) Response {
+	return r.JsonResponse(http.StatusBadRequest, FormError(msg), err)
+}
+
 func (r Request) took() time.Duration           { return time.Since(r.started) }
 func (r Request) PathValue(field string) string { return r.r.PathValue(field) }
 func (r Request) IP() string                    { return r.r.RemoteAddr }
@@ -115,7 +124,7 @@ func HandleHTTP(url string, handler func(Request) Response, options ...httpOptio
 		r.User, err = authenticator(r)
 		if err != nil {
 			r.Log("Got an authentication error: %s", err)
-			res = r.jsonResponse(http.StatusUnauthorized, formError("", r.User), err)
+			res = r.JsonResponse(http.StatusUnauthorized, FormError("", r.User), err)
 		} else {
 			res = handler(r)
 			if err := res.Error(); err != nil {
@@ -143,7 +152,7 @@ func HandleHTTP(url string, handler func(Request) Response, options ...httpOptio
 
 func FixedJsonResponse(res any) func(Request) Response {
 	return func(r Request) Response {
-		return r.jsonResponse(http.StatusOK, res, nil)
+		return r.JsonResponse(http.StatusOK, res, nil)
 	}
 }
 
@@ -174,21 +183,21 @@ func Login(r Request) Response {
 	params, err := getHttpDecoder()(r)
 	if err != nil {
 		r.Log("Could not decode data: %s", err)
-		return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", u), err)
+		return r.JsonResponse(http.StatusBadRequest, FormError("Petició mal formada", u), err)
 	}
 
 	if errors := u.Validate(params); len(errors) > 0 {
-		return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
+		return r.JsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
 	}
 
 	u, err = DBGetBy(r.DB, u, "email", u.Email, struct{}{})
 	if err != nil {
-		return r.jsonResponse(http.StatusBadRequest, formError("Correu o contrasenya incorrectes", u), nil)
+		return r.JsonResponse(http.StatusBadRequest, FormError("Correu o contrasenya incorrectes", u), nil)
 	}
 
 	providedPassword := hashPassword(u.Salt, params["password"].(string))
 	if providedPassword != u.Password {
-		return r.jsonResponse(http.StatusBadRequest, formError("Correu o contrasenya incorrectes", u), nil)
+		return r.JsonResponse(http.StatusBadRequest, FormError("Correu o contrasenya incorrectes", u), nil)
 	}
 
 	// TODO make cookies more secure: https://www.calhoun.io/securing-cookies-in-go
@@ -197,8 +206,8 @@ func Login(r Request) Response {
 		_, err = DBAdd(tx, s)
 		return err
 	}
-	if err := transaction(db, f); err != nil {
-		return r.jsonResponse(http.StatusInternalServerError, formError("", u), err)
+	if err := Transaction(db, f); err != nil {
+		return r.JsonResponse(http.StatusInternalServerError, FormError("", u), err)
 	}
 	c := http.Cookie{
 		Name:  "_session",
@@ -224,7 +233,7 @@ func Me(r Request) Response {
 	s := Session{UserID: r.User.ID}
 	sessions, _, err := DBList(r.DB, s, nil, struct{}{})
 	if err != nil {
-		return r.jsonResponse(http.StatusInternalServerError, formError("", s), err)
+		return r.JsonResponse(http.StatusInternalServerError, FormError("", s), err)
 	}
 
 	r.User.Sessions = sessions
@@ -236,18 +245,18 @@ func DeleteSession(r Request) Response {
 	var userID uint
 	err := r.DB.QueryRow("SELECT user_id FROM sessions WHERE id=?;", id).Scan(&userID)
 	if err != nil {
-		return r.jsonResponse(http.StatusNotFound, formError(err.Error(), r.User), err)
+		return r.JsonResponse(http.StatusNotFound, FormError(err.Error(), r.User), err)
 	}
 
 	if userID != r.User.ID {
-		return r.jsonResponse(http.StatusNotFound, formError("La sessió no existeix", r.User), nil)
+		return r.JsonResponse(http.StatusNotFound, FormError("La sessió no existeix", r.User), nil)
 	}
 
 	if _, err := db.Exec("DELETE FROM sessions WHERE id=?;", id); err != nil {
-		return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), r.User), err)
+		return r.JsonResponse(http.StatusInternalServerError, FormError(err.Error(), r.User), err)
 	}
 
-	return r.jsonResponse(http.StatusOK, map[string]any{"ok": true}, nil)
+	return r.JsonResponse(http.StatusOK, map[string]any{"ok": true}, nil)
 }
 
 func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Response {
@@ -257,11 +266,11 @@ func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Respon
 		a := seed()
 		if err != nil {
 			r.Log("Could not decode data: %s", err)
-			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", a), err)
+			return r.JsonResponse(http.StatusBadRequest, FormError("Petició mal formada", a), err)
 		}
 
 		if errors := a.Validate(params); len(errors) > 0 {
-			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
+			return r.JsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
 		}
 
 		var id uint
@@ -269,8 +278,8 @@ func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Respon
 			id, err = a.Add(tx)
 			return err
 		}
-		if err := transaction(db, f); err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), a), err)
+		if err := Transaction(db, f); err != nil {
+			return r.JsonResponse(http.StatusInternalServerError, FormError(err.Error(), a), err)
 		}
 
 		returner := getHttpReturner(options...)
@@ -285,11 +294,11 @@ func HTTPQueryAdd[T Adder](seed func() T, options ...httpOption) func(Request) R
 		a := seed()
 		if err != nil {
 			r.Log("Could not decode data: %s", err)
-			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", a), err)
+			return r.JsonResponse(http.StatusBadRequest, FormError("Petició mal formada", a), err)
 		}
 
 		if errors := a.Validate(params); len(errors) > 0 {
-			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
+			return r.JsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
 		}
 
 		returner := getHttpReturner(options...)
@@ -302,26 +311,26 @@ func HTTPUpdate[T Updater](seed func() T) func(Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		a := seed()
 		if err != nil {
-			return r.jsonResponse(http.StatusBadRequest, formError(err.Error(), a), err)
+			return r.JsonResponse(http.StatusBadRequest, FormError(err.Error(), a), err)
 		}
 
 		decoder := json.NewDecoder(r.r.Body)
 		var params map[string]any
 		if err := decoder.Decode(&params); err != nil {
 			r.Log("Could not decode data: %s", err)
-			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", a), err)
+			return r.JsonResponse(http.StatusBadRequest, FormError("Petició mal formada", a), err)
 		}
 
 		a.SetID(uint(id))
 		if errors := a.Validate(params); len(errors) > 0 {
-			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
+			return r.JsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
 		}
 
-		if err := transaction(db, a.Update); err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), a), err)
+		if err := Transaction(db, a.Update); err != nil {
+			return r.JsonResponse(http.StatusInternalServerError, FormError(err.Error(), a), err)
 		}
 
-		return r.jsonResponse(http.StatusOK, map[string]any{}, nil)
+		return r.JsonResponse(http.StatusOK, map[string]any{}, nil)
 	}
 }
 
@@ -329,22 +338,22 @@ func HTTPPatch[T Patcher](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		if err != nil {
-			return r.jsonResponse(http.StatusBadRequest, formError(err.Error(), seed), err)
+			return r.JsonResponse(http.StatusBadRequest, FormError(err.Error(), seed), err)
 		}
 
 		decoder := json.NewDecoder(r.r.Body)
 		var params map[string]any
 		if err := decoder.Decode(&params); err != nil {
 			r.Log("Could not decode data: %s", err)
-			return r.jsonResponse(http.StatusBadRequest, formError("Petició mal formada", seed), err)
+			return r.JsonResponse(http.StatusBadRequest, FormError("Petició mal formada", seed), err)
 		}
 
 		if len(params) == 0 {
-			return r.jsonResponse(http.StatusBadRequest, formError("Cal indicar el camp que es vol actualitzar", seed), nil)
+			return r.JsonResponse(http.StatusBadRequest, FormError("Cal indicar el camp que es vol actualitzar", seed), nil)
 		}
 
 		if len(params) > 1 {
-			return r.jsonResponse(http.StatusBadRequest, formError("Només es pot actualitzar un camp per petició", seed), nil)
+			return r.JsonResponse(http.StatusBadRequest, FormError("Només es pot actualitzar un camp per petició", seed), nil)
 		}
 
 		var key string
@@ -356,17 +365,17 @@ func HTTPPatch[T Patcher](seed T) func(Request) Response {
 
 		field, value, errors := seed.ValidatePatch(key, value)
 		if len(errors) > 0 {
-			return r.jsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
+			return r.JsonResponse(http.StatusUnprocessableEntity, jsonErrors(errors), nil)
 		}
 
 		f := func(tx *sql.Tx) error {
 			return seed.Patch(tx, uint(id), field, value)
 		}
-		if err := transaction(db, f); err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), seed), err)
+		if err := Transaction(db, f); err != nil {
+			return r.JsonResponse(http.StatusInternalServerError, FormError(err.Error(), seed), err)
 		}
 
-		return r.jsonResponse(http.StatusOK, map[string]any{}, nil)
+		return r.JsonResponse(http.StatusOK, map[string]any{}, nil)
 	}
 }
 
@@ -374,15 +383,15 @@ func HTTPDelete[T Deleter](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		if err != nil {
-			return r.jsonResponse(http.StatusBadRequest, formError(err.Error(), seed), err)
+			return r.JsonResponse(http.StatusBadRequest, FormError(err.Error(), seed), err)
 		}
 
 		f := func(tx *sql.Tx) (err error) { return seed.Delete(tx, uint(id)) }
-		if err := transaction(db, f); err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), seed), err)
+		if err := Transaction(db, f); err != nil {
+			return r.JsonResponse(http.StatusInternalServerError, FormError(err.Error(), seed), err)
 		}
 
-		return r.jsonResponse(http.StatusOK, map[string]any{}, nil)
+		return r.JsonResponse(http.StatusOK, map[string]any{}, nil)
 	}
 }
 
@@ -390,15 +399,15 @@ func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		if err != nil {
-			return r.jsonResponse(http.StatusBadRequest, formError(err.Error(), seed), err)
+			return r.JsonResponse(http.StatusBadRequest, FormError(err.Error(), seed), err)
 		}
 
 		a, err := seed.Get(db, uint(id))
 		if err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), seed), err)
+			return r.JsonResponse(http.StatusInternalServerError, FormError(err.Error(), seed), err)
 		}
 
-		return r.jsonResponse(http.StatusOK, a, nil)
+		return r.JsonResponse(http.StatusOK, a, nil)
 	}
 }
 
@@ -406,10 +415,10 @@ func HTTPList[C any, T Lister[T, C]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		items, total, err := seed.List(db, NewPaginator(r.r), seed.FilterCriteria(r.r))
 		if err != nil {
-			return r.jsonResponse(http.StatusInternalServerError, formError(err.Error(), seed), err)
+			return r.JsonResponse(http.StatusInternalServerError, FormError(err.Error(), seed), err)
 		}
 
-		return r.jsonResponse(http.StatusOK, map[string]any{
+		return r.JsonResponse(http.StatusOK, map[string]any{
 			"total": total,
 			"items": items,
 		}, nil)
@@ -455,7 +464,7 @@ func (r Request) TemplateResponse(templateName string, data any, err error) Temp
 	return TemplateResponse{status: http.StatusOK, Reader: reader, err: err}
 }
 
-func (r Request) jsonResponse(status int, value any, err error) JsonResponse {
+func (r Request) JsonResponse(status int, value any, err error) JsonResponse {
 	reader, writer := io.Pipe()
 	go func() {
 		if err := json.NewEncoder(writer).Encode(value); err != nil {
@@ -473,8 +482,12 @@ func internalServerErrorJsonResponse() Response {
 	}
 }
 
-func formError(msg string, t any) map[string]ApiErrors {
-	return jsonErrors(ApiErrors{"__form__": []string{translateError(msg, t)}})
+func FormError(msg string, t ...any) map[string]ApiErrors {
+	var translator any
+	if len(t) > 0 {
+		translator = t[0]
+	}
+	return jsonErrors(ApiErrors{"__form__": []string{TranslateError(msg, translator)}})
 }
 
 func jsonErrors(errors ApiErrors) map[string]ApiErrors {

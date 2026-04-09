@@ -57,7 +57,7 @@ func migrateFiles(db *sql.DB, app string, migrationFiles embed.FS) error {
 }
 
 func migrateFile(db *sql.DB, app, filename, contents string) error {
-	return transaction(db, func(tx *sql.Tx) error {
+	return Transaction(db, func(tx *sql.Tx) error {
 		var count int
 		err := db.QueryRow("SELECT COUNT(1) FROM sqlite_master WHERE name='migrations';").Scan(&count)
 		if err != nil {
@@ -85,7 +85,7 @@ func migrateFile(db *sql.DB, app, filename, contents string) error {
 	})
 }
 
-func transaction(db *sql.DB, f func(*sql.Tx) error) error {
+func Transaction(db *sql.DB, f func(*sql.Tx) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		tx.Rollback()

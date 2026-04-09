@@ -2,8 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"fmt"
 	"net/http"
+	"strings"
 
 	app "github.com/oriolf/simple-app"
 )
@@ -50,7 +52,7 @@ func (m Member) ValidatePatch(field string, value any) (string, any, app.ApiErro
 	return field, res, v.Errors()
 }
 
-func (m *Member) ValidationTranslations() map[string]string {
+func (m Member) ValidationTranslations() map[string]string {
 	return map[string]string{
 		"UNIQUE constraint failed: members.nif": "Ja existeix un soci amb aquest DNI",
 	}
@@ -142,4 +144,74 @@ func (Member) SQLParams(criteria memberFilterCriteria) []any {
 		return []any{search, search}
 	}
 	return nil
+}
+
+type importMembersParams struct {
+	SkipFirstRow   bool   `json:"skip_first_row"`
+	NameColumn     uint   `json:"name_column"`
+	NIFColumn      uint   `json:"nif_column"`
+	JoinedOnColumn uint   `json:"joined_on_column"`
+	CSV            string `json:"csv"`
+}
+
+func importMembers(r app.Request) app.Response {
+	var params importMembersParams
+	if err := r.DecodeJsonBody(&params); err != nil {
+		r.Log("Could not decode data: %s", err)
+		return r.JsonBadRequest("Petició mal formada", err)
+	}
+
+	rows, err := csv.NewReader(strings.NewReader(params.CSV)).ReadAll()
+	if err != nil {
+		r.Log("Could not decode CSV: %s", err)
+		return r.JsonBadRequest("CSV mal format", err)
+	}
+
+	if params.SkipFirstRow && len(rows) < 2 || !params.SkipFirstRow && len(rows) == 0 {
+		return r.JsonBadRequest("El CSV ha de contindre una fila com a mínim", nil)
+	}
+
+	if params.NameColumn == params.NIFColumn || params.NameColumn == params.JoinedOnColumn || params.NIFColumn == params.JoinedOnColumn {
+		return r.JsonBadRequest("Les columnes indicades han de ser totes diferents", nil)
+	}
+
+	columnCount := uint(len(rows[0]))
+	if params.NameColumn >= columnCount || params.NIFColumn >= columnCount || params.JoinedOnColumn >= columnCount {
+		return r.JsonBadRequest("El CSV no conté suficients columnes", nil)
+	}
+
+	if params.SkipFirstRow {
+		rows = rows[1:]
+	}
+
+	var results []any
+	f := func(tx *sql.Tx) (err error) {
+		for _, row := range rows {
+			values := map[string]any{
+				"name":      row[params.NameColumn],
+				"nif":       row[params.NIFColumn],
+				"joined_on": row[params.JoinedOnColumn],
+			}
+			var a Member
+			if errors := a.Validate(values); len(errors) > 0 {
+				results = append(results, map[string]any{"errors": errors})
+				continue
+			}
+
+			id, err := a.Add(tx)
+			if err != nil {
+				results = append(results, map[string]any{"errors": []string{app.TranslateError(err.Error(), a)}})
+				continue
+			}
+
+			results = append(results, map[string]any{"id": id})
+		}
+
+		return nil
+	}
+	if err := app.Transaction(app.DB(), f); err != nil {
+		return r.JsonResponse(http.StatusInternalServerError, app.FormError(err.Error(), Member{}), err)
+	}
+
+	return app.JsonReturner().Return(r, http.StatusOK, map[string]any{"results": results})
 }
