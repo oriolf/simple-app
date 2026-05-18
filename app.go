@@ -24,9 +24,9 @@ func Init(options ...Option) (err error) {
 	return nil
 }
 
-func InitSQL(migrationFiles embed.FS) Option {
+func InitSQL(migrationFiles embed.FS, dataFolder ...string) Option {
 	return func() (err error) {
-		if db, err = initSQL(migrationFiles); err != nil {
+		if db, err = initSQL(migrationFiles, dataFolder...); err != nil {
 			return fmt.Errorf("could not initialize sql: %w", err)
 		}
 		return nil

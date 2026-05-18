@@ -14,8 +14,13 @@ var simpleMigrations embed.FS
 
 func DB() *sql.DB { return db }
 
-func initSQL(migrationFiles embed.FS) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", "db.db")
+func initSQL(migrationFiles embed.FS, dataFolder ...string) (*sql.DB, error) {
+	path := "db.db"
+	if dataFolder != nil && len(dataFolder) > 0 && dataFolder[0] != "" {
+		path = dataFolder[0] + "/" + path
+	}
+
+	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, fmt.Errorf("could not open db: %w", err)
 	}
