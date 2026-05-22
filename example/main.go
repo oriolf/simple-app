@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"embed"
 	"fmt"
 	"log"
@@ -26,6 +27,10 @@ func main() {
 
 	app.Execute(
 		app.Command{Name: "http", Handler: httpHandlers},
+		app.Command{Name: "seed-e2e", Handler: seedE2E},
+		app.Command{Name: "validate", Commands: []app.Command{
+			{Name: "dni", Handler: validateDNI},
+		}},
 		app.Command{Name: "member", Commands: []app.Command{
 			{Name: "add", Handler: app.CLIAdd(MemberFactory)},
 		}},
@@ -83,4 +88,22 @@ func HTTPMemberGetEditField(r app.Request) app.Response {
 	}
 
 	return r.TemplateResponse("member_edit_field.html", map[string]any{"field": field, "member": member}, nil)
+}
+
+func seedE2E([]string) []string {
+	user := app.SuperUserFactory()
+	user.Validate(map[string]any{
+		"email":    "usuari@example.com",
+		"password": "usuariusuari",
+	})
+	f := func(tx *sql.Tx) (err error) {
+		user.Add(tx)
+		return nil
+	}
+	app.Transaction(app.DB(), f)
+	return []string{}
+}
+
+func validateDNI(args []string) []string {
+	return []string{app.ComputeSpanishDNIControlCharacter(args[0])}
 }

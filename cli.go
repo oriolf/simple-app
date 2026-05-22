@@ -37,7 +37,7 @@ func CLIAdd[T Adder](seed func() T) func([]string) []string {
 			return []string{fmt.Sprintf("Could not add from cli: %s", TranslateError(err.Error(), a))}
 		}
 
-		return []string{fmt.Sprintf("Created user %d", id)}
+		return []string{fmt.Sprintf("Created entity with ID %d", id)}
 	}
 }
 

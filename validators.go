@@ -167,30 +167,30 @@ func isLeapYear(year uint) bool {
 	return year%4 == 0 && year%100 != 0
 }
 
-var spanishDNIControlDigits = map[string]int{
-	"T": 0,
-	"R": 1,
-	"W": 2,
-	"A": 3,
-	"G": 4,
-	"M": 5,
-	"Y": 6,
-	"F": 7,
-	"P": 8,
-	"D": 9,
-	"X": 10,
-	"B": 11,
-	"N": 12,
-	"J": 13,
-	"Z": 14,
-	"S": 15,
-	"Q": 16,
-	"V": 17,
-	"H": 18,
-	"L": 19,
-	"C": 20,
-	"K": 21,
-	"E": 22,
+var spanishDNIControlCharacters = []string{
+	"T",
+	"R",
+	"W",
+	"A",
+	"G",
+	"M",
+	"Y",
+	"F",
+	"P",
+	"D",
+	"X",
+	"B",
+	"N",
+	"J",
+	"Z",
+	"S",
+	"Q",
+	"V",
+	"H",
+	"L",
+	"C",
+	"K",
+	"E",
 }
 
 func (v *validator) ValidateSpanishDNI(field string) string {
@@ -212,17 +212,20 @@ func (v *validator) ValidateSpanishDNI(field string) string {
 		return value
 	}
 
-	controlDigit := value[8:]
-	controlNumber, ok := spanishDNIControlDigits[controlDigit]
-	if !ok {
-		v.AddError(field, "La lletra del DNI no és correcta")
-		return value
-	}
-
-	if controlNumber != number%23 {
+	controlCharacter := value[8:]
+	if controlCharacter != spanishDNIControlCharacters[number%23] {
 		v.AddError(field, "La lletra del DNI no és correcta, o algun dígit no és correcte")
 		return value
 	}
 
 	return value
+}
+
+func ComputeSpanishDNIControlCharacter(dni string) string {
+	number, err := strconv.Atoi(dni)
+	if err != nil {
+		return ""
+	}
+
+	return spanishDNIControlCharacters[number%23]
 }

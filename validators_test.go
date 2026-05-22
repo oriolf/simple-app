@@ -59,7 +59,7 @@ func TestValidateSpanishDNI(t *testing.T) {
 		{input: nil, expectedString: "", expectedError: "El camp ha de ser una cadena de text"},
 		{input: " a", expectedString: "A", expectedError: "El DNI ha de tindre exactament 8 dígits i una lletra"},
 		{input: "aaaaaaaaa", expectedString: "AAAAAAAAA", expectedError: "El primers vuit dígits del DNI han de ser números"},
-		{input: "000000001", expectedString: "000000001", expectedError: "La lletra del DNI no és correcta"},
+		{input: "000000001", expectedString: "000000001", expectedError: "La lletra del DNI no és correcta, o algun dígit no és correcte"},
 		{input: "00000000A", expectedString: "00000000A", expectedError: "La lletra del DNI no és correcta, o algun dígit no és correcte"},
 		{input: "00000000T", expectedString: "00000000T"},
 	} {
