@@ -63,12 +63,10 @@ func Filter[T any](s []T, f func(T) bool) (out []T) {
 	return out
 }
 
-func TranslateError(msg string, t any) string {
-	if v, ok := t.(ValidationTranslator); ok {
-		for k, v := range v.ValidationTranslations() {
-			if strings.Contains(msg, k) {
-				return v
-			}
+func TranslateError(msg string) string {
+	for k, v := range globalErrorTranslations {
+		if strings.Contains(msg, k) {
+			return v
 		}
 	}
 

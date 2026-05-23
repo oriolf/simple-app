@@ -105,10 +105,38 @@ func (d *DateTime) FromString(s string) (err error) {
 	return err
 }
 
-type ApiErrors = map[string][]string
+type ApiErrors struct {
+	Global []string            `json:"global"`
+	Fields map[string][]string `json:"fields"`
+}
 
-type ValidationTranslator interface {
-	ValidationTranslations() map[string]string
+func NewGlobalApiError(msg string) ApiErrors {
+	return ApiErrors{Global: []string{msg}}
+}
+
+func (e ApiErrors) Empty() bool {
+	return len(e.Global) == 0 && len(e.Fields) == 0
+}
+
+func (e ApiErrors) NotEmpty() bool {
+	return !e.Empty()
+}
+
+func (e ApiErrors) FormatForCli() (msgs []string) {
+	msgs = append(msgs, "Global:")
+	msgs = e.appendCliSubmessages(msgs, e.Global)
+	for k, v := range e.Fields {
+		msgs = append(msgs, k+":")
+		msgs = e.appendCliSubmessages(msgs, v)
+	}
+	return msgs
+}
+
+func (e ApiErrors) appendCliSubmessages(msgs []string, newMessages []string) []string {
+	for _, msg := range newMessages {
+		msgs = append(msgs, "    "+msg)
+	}
+	return msgs
 }
 
 type Validator interface {

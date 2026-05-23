@@ -17,15 +17,8 @@ func CLIAdd[T Adder](seed func() T) func([]string) []string {
 			return []string{err.Error()}
 		}
 
-		if errors := a.Validate(params); len(errors) > 0 {
-			msgs := []string{"There are errors in the parameters:"}
-			for k, v := range errors {
-				msgs = append(msgs, k+":")
-				for _, msg := range v {
-					msgs = append(msgs, "    "+msg)
-				}
-			}
-			return msgs
+		if errors := a.Validate(params); errors.NotEmpty() {
+			return append([]string{"There are errors in the parameters:"}, errors.FormatForCli()...)
 		}
 
 		var id uint
@@ -34,7 +27,7 @@ func CLIAdd[T Adder](seed func() T) func([]string) []string {
 			return err
 		}
 		if err := Transaction(db, f); err != nil {
-			return []string{fmt.Sprintf("Could not add from cli: %s", TranslateError(err.Error(), a))}
+			return []string{fmt.Sprintf("Could not add from cli: %s", TranslateError(err.Error()))}
 		}
 
 		return []string{fmt.Sprintf("Created entity with ID %d", id)}

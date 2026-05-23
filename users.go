@@ -121,12 +121,6 @@ func (u User) SQLInsert(tx *sql.Tx) (sql.Result, error) {
 		u.Email, u.Salt, u.Password, u.Roles)
 }
 
-func (u *User) ValidationTranslations() map[string]string {
-	return map[string]string{
-		"UNIQUE constraint failed: users.email": "Ja existeix un usuari amb aquest correu electrònic",
-	}
-}
-
 func (User) SelectSQL(struct{}) string { return "SELECT id, email, salt, password, roles FROM users " }
 func (User) CountSQL(struct{}) string  { return "SELECT COUNT(1) FROM users;" }
 func (User) OrderSQL(struct{}) string  { return "ORDER BY email ASC " }

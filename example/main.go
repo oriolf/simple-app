@@ -21,7 +21,14 @@ var staticFiles embed.FS
 var templateFiles embed.FS
 
 func main() {
-	if err := app.Init(app.InitSQL(migrationFiles), app.InitTemplates(templateFiles)); err != nil {
+	err := app.Init(
+		app.RegisterErrorTranslations(
+			map[string]string{"UNIQUE constraint failed: members.nif": "Ja existeix un soci amb aquest DNI"},
+		),
+		app.InitSQL(migrationFiles),
+		app.InitTemplates(templateFiles),
+	)
+	if err != nil {
 		log.Fatalln("Could not initialize app:", err)
 	}
 

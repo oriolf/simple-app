@@ -70,7 +70,7 @@ type httpJsonReturner struct {
 
 func (o httpJsonReturner) canReturn() bool { return true }
 func (o httpJsonReturner) Return(r Request, status int, data any) Response {
-	return r.JsonResponse(status, data, nil)
+	return r.jsonResponse(status, data, nil)
 }
 
 func Redirect(url string) httpOption {

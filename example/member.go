@@ -46,16 +46,10 @@ func (m Member) ValidatePatch(field string, value any) (string, any, app.ApiErro
 	case "joined_on":
 		res = v.ValidateDate(field)
 	default:
-		return field, value, app.ApiErrors{field: []string{"Camp desconegut"}}
+		return field, value, app.ApiErrors{Fields: map[string][]string{field: []string{"Camp desconegut"}}}
 	}
 
 	return field, res, v.Errors()
-}
-
-func (m Member) ValidationTranslations() map[string]string {
-	return map[string]string{
-		"UNIQUE constraint failed: members.nif": "Ja existeix un soci amb aquest DNI",
-	}
 }
 
 func (m Member) Add(tx *sql.Tx) (uint, error) {
@@ -193,14 +187,14 @@ func importMembers(r app.Request) app.Response {
 				"joined_on": row[params.JoinedOnColumn],
 			}
 			var a Member
-			if errors := a.Validate(values); len(errors) > 0 {
-				results = append(results, map[string]any{"errors": errors})
+			if errors := a.Validate(values); errors.NotEmpty() {
+				results = append(results, map[string]any{"errors": errors.Fields})
 				continue
 			}
 
 			id, err := a.Add(tx)
 			if err != nil {
-				results = append(results, map[string]any{"errors": []string{app.TranslateError(err.Error(), a)}})
+				results = append(results, map[string]any{"errors": []string{app.TranslateError(err.Error())}})
 				continue
 			}
 
@@ -210,7 +204,7 @@ func importMembers(r app.Request) app.Response {
 		return nil
 	}
 	if err := app.Transaction(app.DB(), f); err != nil {
-		return r.JsonResponse(http.StatusInternalServerError, app.FormError(err.Error(), Member{}), err)
+		return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 	}
 
 	return app.JsonReturner().Return(r, http.StatusOK, map[string]any{"results": results})

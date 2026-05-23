@@ -12,6 +12,10 @@ var (
 	db  *sql.DB
 	bot *telegram.BotAPI
 
+	globalErrorTranslations = map[string]string{
+		"UNIQUE constraint failed: users.email": "Ja existeix un usuari amb aquest correu electrònic",
+	}
+
 	TELEGRAM_CHAT int64
 )
 
@@ -51,6 +55,15 @@ func InitTelegram(token string, chat int64) Option {
 		TELEGRAM_CHAT = chat
 		if bot, err = telegram.NewBotAPI(token); err != nil {
 			return fmt.Errorf("could not initialize telegram: %s", err)
+		}
+		return nil
+	}
+}
+
+func RegisterErrorTranslations(translations map[string]string) Option {
+	return func() (err error) {
+		for k, v := range translations {
+			globalErrorTranslations[k] = v
 		}
 		return nil
 	}

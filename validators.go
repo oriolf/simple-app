@@ -14,15 +14,15 @@ type validator struct {
 }
 
 func NewValidator(params map[string]any) validator {
-	return validator{params: params, errors: make(ApiErrors)}
+	return validator{params: params, errors: ApiErrors{Fields: make(map[string][]string)}}
 }
 
 func (v validator) HasError(field string) bool {
-	return len(v.errors[field]) > 0
+	return len(v.errors.Fields[field]) > 0
 }
 
 func (v validator) AddError(field, msg string) {
-	v.errors[field] = append(v.errors[field], msg)
+	v.errors.Fields[field] = append(v.errors.Fields[field], msg)
 }
 
 func (v validator) Errors() ApiErrors { return v.errors }

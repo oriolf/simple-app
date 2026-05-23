@@ -74,14 +74,14 @@ func TestValidateSpanishDNI(t *testing.T) {
 
 func checkValidationErrors(t *testing.T, i int, expected string, errors ApiErrors) {
 	if expected == "" {
-		if len(errors) > 0 {
-			t.Errorf("[%d] Expected no error, but got %v", i, errors[""])
+		if errors.NotEmpty() {
+			t.Errorf("[%d] Expected no error, but got %v", i, errors.Fields[""])
 		}
 	} else if expected != "" {
-		if len(errors) == 0 {
+		if errors.Empty() {
 			t.Errorf("[%d] Expected error %s, but got no error", i, expected)
 		} else {
-			errs := errors[""]
+			errs := errors.Fields[""]
 			if len(errs) != 1 {
 				t.Errorf("[%d] Expected one error, but got %d: %v", i, len(errs), errs)
 			} else if errs[0] != expected {
