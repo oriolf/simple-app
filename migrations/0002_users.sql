@@ -1,5 +1,5 @@
 CREATE TABLE users (
-    id INTEGER NOT NULL PRIMARY KEY,
+    id       INTEGER NOT NULL PRIMARY KEY,
     email    TEXT NOT NULL UNIQUE,
     salt     TEXT NOT NULL,
     password TEXT NOT NULL,
@@ -12,5 +12,6 @@ CREATE TABLE sessions (
     time    TEXT NOT NULL,
     ip      TEXT NOT NULL,
     agent   TEXT NOT NULL,
-    expires TEXT NOT NULL
+    expires TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
 );

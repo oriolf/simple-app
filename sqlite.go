@@ -25,6 +25,10 @@ func initSQL(migrationFiles embed.FS, dataFolder ...string) (*sql.DB, error) {
 		return nil, fmt.Errorf("could not open db: %w", err)
 	}
 
+	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
+		return nil, fmt.Errorf("could not set foreign keys enforcement: %w", err)
+	}
+
 	if err := migrateFiles(db, "simple", simpleMigrations); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("could not migrate simple files: %w", err)
