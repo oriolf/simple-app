@@ -99,8 +99,6 @@ func (Session) Scan(rows *sql.Rows) (s Session, err error) {
 	return s, rows.Scan(&s.ID, &s.IP, &s.Agent, &s.Time, &s.Expires)
 }
 
-var CLIAddSuperUser = CLIAdd(SuperUserFactory)
-
 func SuperUserFactory() *User { return &User{Roles: Roles{RoleSuperUser}} }
 
 func (u *User) Validate(params map[string]any) ApiErrors {

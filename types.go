@@ -285,12 +285,6 @@ type SQLJoinLister[T, C any] interface {
 
 type Option func() error
 
-type Command struct {
-	Name     string
-	Handler  func([]string) []string
-	Commands []Command
-}
-
 func GenerateTypescriptTypes(models ...any) func([]string) []string {
 	return func([]string) []string {
 		for _, model := range models {

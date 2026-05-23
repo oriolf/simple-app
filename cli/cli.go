@@ -1,4 +1,4 @@
-package app
+package cli
 
 import (
 	"database/sql"
@@ -6,9 +6,17 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	app "github.com/oriolf/simple-app"
 )
 
-func CLIAdd[T Adder](seed func() T) func([]string) []string {
+type Command struct {
+	Name     string
+	Handler  func([]string) []string
+	Commands []Command
+}
+
+func Add[T app.Adder](seed func() T) func([]string) []string {
 	return func(args []string) []string {
 		a := seed()
 
@@ -26,8 +34,8 @@ func CLIAdd[T Adder](seed func() T) func([]string) []string {
 			id, err = a.Add(tx)
 			return err
 		}
-		if err := Transaction(db, f); err != nil {
-			return []string{fmt.Sprintf("Could not add from cli: %s", TranslateError(err.Error()))}
+		if err := app.Transaction(app.DB(), f); err != nil {
+			return []string{fmt.Sprintf("Could not add from cli: %s", app.TranslateError(err.Error()))}
 		}
 
 		return []string{fmt.Sprintf("Created entity with ID %d", id)}

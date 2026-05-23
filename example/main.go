@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	app "github.com/oriolf/simple-app"
+	"github.com/oriolf/simple-app/cli"
 )
 
 //go:embed migrations
@@ -32,19 +33,19 @@ func main() {
 		log.Fatalln("Could not initialize app:", err)
 	}
 
-	app.Execute(
-		app.Command{Name: "http", Handler: httpHandlers},
-		app.Command{Name: "seed-e2e", Handler: seedE2E},
-		app.Command{Name: "validate", Commands: []app.Command{
+	cli.Execute(
+		cli.Command{Name: "http", Handler: httpHandlers},
+		cli.Command{Name: "seed-e2e", Handler: seedE2E},
+		cli.Command{Name: "validate", Commands: []cli.Command{
 			{Name: "dni", Handler: validateDNI},
 		}},
-		app.Command{Name: "member", Commands: []app.Command{
-			{Name: "add", Handler: app.CLIAdd(MemberFactory)},
+		cli.Command{Name: "member", Commands: []cli.Command{
+			{Name: "add", Handler: cli.Add(MemberFactory)},
 		}},
-		app.Command{Name: "user", Commands: []app.Command{
-			{Name: "add", Handler: app.CLIAddSuperUser},
+		cli.Command{Name: "user", Commands: []cli.Command{
+			{Name: "add", Handler: cli.Add(app.SuperUserFactory)},
 		}},
-		app.Command{Name: "types", Commands: []app.Command{
+		cli.Command{Name: "types", Commands: []cli.Command{
 			{Name: "generate", Handler: app.GenerateTypescriptTypes(app.User{}, app.Session{}, Member{})},
 		}},
 	)
