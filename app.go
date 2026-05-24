@@ -37,19 +37,6 @@ func InitSQL(migrationFiles embed.FS, dataFolder ...string) Option {
 	}
 }
 
-func InitTemplates(templateFiles embed.FS, templateFuncs ...map[string]any) Option {
-	return func() error {
-		funcs := map[string]any{}
-		if templateFuncs != nil {
-			funcs = templateFuncs[0]
-		}
-		if err := initTemplates(templateFiles, funcs); err != nil {
-			return fmt.Errorf("could not initialize templates: %w", err)
-		}
-		return nil
-	}
-}
-
 func InitTelegram(token string, chat int64) Option {
 	return func() (err error) {
 		TELEGRAM_CHAT = chat

@@ -5,11 +5,11 @@ import (
 	"embed"
 	"fmt"
 	"log"
-	"net/http"
 	"strconv"
 
 	app "github.com/oriolf/simple-app"
 	"github.com/oriolf/simple-app/cli"
+	"github.com/oriolf/simple-app/http"
 )
 
 //go:embed migrations
@@ -27,7 +27,7 @@ func main() {
 			map[string]string{"UNIQUE constraint failed: members.nif": "Ja existeix un soci amb aquest DNI"},
 		),
 		app.InitSQL(migrationFiles),
-		app.InitTemplates(templateFiles),
+		http.InitTemplates(templateFiles),
 	)
 	if err != nil {
 		log.Fatalln("Could not initialize app:", err)
@@ -53,33 +53,33 @@ func main() {
 
 func httpHandlers([]string) []string {
 	// API
-	app.HandleHTTP("GET /api/ok", app.FixedJsonResponse(map[string]bool{"ok": true}))
-	app.HandleHTTP("POST /api/login", app.Login)
+	http.Handle("GET /api/ok", http.FixedJsonResponse(map[string]bool{"ok": true}))
+	http.Handle("POST /api/login", http.Login)
 
-	group := app.HTTPGroup(app.DefaultAuthentication)
-	group.HandleHTTP("GET /api/me", app.Me)
-	group.HandleHTTP("DELETE /api/sessions/{id}", app.DeleteSession)
-	group.HandleHTTP("GET /api/members", app.HTTPList(Member{}))
-	group.HandleHTTP("GET /api/members/{id}", app.HTTPGet(Member{}))
-	group.HandleHTTP("POST /api/members", app.HTTPAdd(MemberFactory))
-	group.HandleHTTP("QUERY /api/members", app.HTTPQueryAdd(MemberFactory))
-	group.HandleHTTP("POST /api/members/import", importMembers)
-	group.HandleHTTP("PUT /api/members/{id}", app.HTTPUpdate(MemberFactory))
-	group.HandleHTTP("DELETE /api/members/{id}", app.HTTPDelete(Member{}))
-	group.HandleHTTP("PATCH /api/members/{id}", app.HTTPPatch(Member{}))
+	group := http.Group(http.DefaultAuthentication)
+	group.Handle("GET /api/me", http.Me)
+	group.Handle("DELETE /api/sessions/{id}", http.DeleteSession)
+	group.Handle("GET /api/members", http.List(Member{}))
+	group.Handle("GET /api/members/{id}", http.Get(Member{}))
+	group.Handle("POST /api/members", http.Add(MemberFactory))
+	group.Handle("QUERY /api/members", http.QueryAdd(MemberFactory))
+	group.Handle("POST /api/members/import", importMembers)
+	group.Handle("PUT /api/members/{id}", http.Update(MemberFactory))
+	group.Handle("DELETE /api/members/{id}", http.Delete(Member{}))
+	group.Handle("PATCH /api/members/{id}", http.Patch(Member{}))
 
 	// HTML + HTMX
-	app.HandleHTTP("GET /{$}", app.HTTPTemplateList("index.html", Member{}))
-	app.HandleHTTP("DELETE /members/{id}", app.HXTriggerAfterSwap(app.HTTPDelete(Member{}), "members-updated"))
-	app.HandleHTTP("POST /members", app.HXTriggerAfterSwap(app.HTTPAdd(MemberFactory), "members-updated"))
-	app.HandleHTTP("GET /members/{id}/patch-field/{field}", HTTPMemberGetEditField)
+	http.Handle("GET /{$}", http.TemplateList("index.html", Member{}))
+	http.Handle("DELETE /members/{id}", http.HXTriggerAfterSwap(http.Delete(Member{}), "members-updated"))
+	http.Handle("POST /members", http.HXTriggerAfterSwap(http.Add(MemberFactory), "members-updated"))
+	http.Handle("GET /members/{id}/patch-field/{field}", HTTPMemberGetEditField)
 
 	// Static
-	http.Handle("GET /static/", http.FileServerFS(staticFiles))
-	return []string{app.ServeHTTP().Error()}
+	http.HandleStatic("GET /static/", staticFiles)
+	return []string{http.Serve().Error()}
 }
 
-func HTTPMemberGetEditField(r app.Request) app.Response {
+func HTTPMemberGetEditField(r http.Request) http.Response {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		return r.TemplateError(err)

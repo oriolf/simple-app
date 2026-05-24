@@ -108,8 +108,13 @@ func (u *User) Validate(params map[string]any) ApiErrors {
 	return v.Errors()
 }
 
+func (u User) ValidPassword(password string) bool {
+	passwordHash := hashPassword(u.Salt, password)
+	return passwordHash == u.Password
+}
+
 func (u User) Add(tx *sql.Tx) (uint, error) {
-	u.Salt = generateRandomID()
+	u.Salt = GenerateRandomID()
 	u.Password = hashPassword(u.Salt, u.Password)
 	return DBAdd(tx, u)
 }

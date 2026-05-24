@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	app "github.com/oriolf/simple-app"
+	httpapi "github.com/oriolf/simple-app/http"
 )
 
 type Member struct {
@@ -148,7 +149,7 @@ type importMembersParams struct {
 	CSV            string `json:"csv"`
 }
 
-func importMembers(r app.Request) app.Response {
+func importMembers(r httpapi.Request) httpapi.Response {
 	var params importMembersParams
 	if err := r.DecodeJsonBody(&params); err != nil {
 		r.Log("Could not decode data: %s", err)
@@ -207,5 +208,5 @@ func importMembers(r app.Request) app.Response {
 		return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 	}
 
-	return app.JsonReturner().Return(r, http.StatusOK, map[string]any{"results": results})
+	return httpapi.JsonReturner().Return(r, http.StatusOK, map[string]any{"results": results})
 }

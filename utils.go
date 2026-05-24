@@ -73,7 +73,7 @@ func TranslateError(msg string) string {
 	return msg
 }
 
-func generateRandomID() string {
+func GenerateRandomID() string {
 	salt := make([]byte, 32)
 	rand.Read(salt)
 	return hex.EncodeToString(salt)

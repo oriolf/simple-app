@@ -1,10 +1,12 @@
-package app
+package http
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	app "github.com/oriolf/simple-app"
 )
 
 type httpOption interface {
@@ -15,17 +17,17 @@ type httpOption interface {
 	Return(Request, int, any) Response
 
 	canAuthenticate() bool
-	Authenticate(Request) (*User, error)
+	Authenticate(Request) (*app.User, error)
 }
 
 type httpBaseOption struct{}
 
-func (o httpBaseOption) canDecode() bool                        { return false }
-func (o httpBaseOption) decode(Request) (map[string]any, error) { return nil, nil }
-func (o httpBaseOption) canReturn() bool                        { return false }
-func (o httpBaseOption) Return(Request, int, any) Response      { return JsonResponse{} }
-func (o httpBaseOption) canAuthenticate() bool                  { return false }
-func (o httpBaseOption) Authenticate(Request) (*User, error)    { return nil, nil }
+func (o httpBaseOption) canDecode() bool                         { return false }
+func (o httpBaseOption) decode(Request) (map[string]any, error)  { return nil, nil }
+func (o httpBaseOption) canReturn() bool                         { return false }
+func (o httpBaseOption) Return(Request, int, any) Response       { return JsonResponse{} }
+func (o httpBaseOption) canAuthenticate() bool                   { return false }
+func (o httpBaseOption) Authenticate(Request) (*app.User, error) { return nil, nil }
 
 // Input formats
 
@@ -95,19 +97,19 @@ type httpDefaultAuthenticator struct{ httpBaseOption }
 var DefaultAuthentication = httpDefaultAuthenticator{}
 
 func (httpDefaultAuthenticator) canAuthenticate() bool { return true }
-func (httpDefaultAuthenticator) Authenticate(r Request) (*User, error) {
+func (httpDefaultAuthenticator) Authenticate(r Request) (*app.User, error) {
 	c, err := r.r.Cookie("_session")
 	if err != nil {
 		return nil, fmt.Errorf("could not get cookie: %w", err)
 	}
 
 	var userID uint
-	err = r.DB.QueryRow("SELECT user_id FROM sessions WHERE id=? AND expires > ?;", c.Value, Now()).Scan(&userID)
+	err = r.DB.QueryRow("SELECT user_id FROM sessions WHERE id=? AND expires > ?;", c.Value, app.Now()).Scan(&userID)
 	if err != nil {
 		return nil, fmt.Errorf("session not found: %w", err)
 	}
 
-	user, err := DBGet(r.DB, User{}, userID, struct{}{})
+	user, err := app.DBGet(r.DB, app.User{}, userID, struct{}{})
 	if err != nil {
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
@@ -121,6 +123,6 @@ type httpGroup struct {
 	options []httpOption
 }
 
-func HTTPGroup(options ...httpOption) httpGroup {
+func Group(options ...httpOption) httpGroup {
 	return httpGroup{options}
 }

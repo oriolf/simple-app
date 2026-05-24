@@ -1,19 +1,18 @@
-package app
+package http
 
 import (
 	"bytes"
 	"database/sql"
 	"embed"
 	"encoding/json"
-	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
+
+	app "github.com/oriolf/simple-app"
 )
 
 type Request struct {
@@ -22,14 +21,14 @@ type Request struct {
 	w       http.ResponseWriter
 	started time.Time
 	DB      *sql.DB
-	User    *User
+	User    *app.User
 }
 
 var requestId uint64
 
 func NewRequest(r *http.Request, w http.ResponseWriter) Request {
 	id := atomic.AddUint64(&requestId, 1)
-	return Request{id: uint(id), r: r, w: w, started: time.Now(), DB: db}
+	return Request{id: uint(id), r: r, w: w, started: time.Now(), DB: app.DB()}
 }
 
 func (r Request) Log(msg string, args ...any) {
@@ -83,7 +82,7 @@ type RedirectResponse struct {
 func (r RedirectResponse) Status() int          { return r.status }
 func (r RedirectResponse) InternalError() error { return nil }
 
-func ServeHTTP() error {
+func Serve() error {
 	http.HandleFunc("OPTIONS /", func(w http.ResponseWriter, request *http.Request) {
 		// TODO make it configurable
 		w.Header().Add("Access-Control-Allow-Origin", "http://localhost:5173")
@@ -91,23 +90,26 @@ func ServeHTTP() error {
 		w.Header().Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, PATCH, QUERY")
 	})
 
-	defer db.Close()
 	port := ":8080"
 	log.Printf("Listening on %s...\n", port)
 	return http.ListenAndServe(port, nil)
 }
 
-func HTTPStatic(staticFiles embed.FS, filename string) func(http.ResponseWriter, *http.Request) {
+func StaticFile(staticFiles embed.FS, filename string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, staticFiles, "static/"+filename)
 	}
 }
 
-func (g httpGroup) HandleHTTP(url string, handler func(Request) Response) {
-	HandleHTTP(url, handler, g.options...)
+func HandleStatic(url string, files embed.FS) {
+	http.Handle(url, http.FileServerFS(files))
 }
 
-func HandleHTTP(url string, handler func(Request) Response, options ...httpOption) {
+func (g httpGroup) Handle(url string, handler func(Request) Response) {
+	Handle(url, handler, g.options...)
+}
+
+func Handle(url string, handler func(Request) Response, options ...httpOption) {
 	http.HandleFunc(url, func(w http.ResponseWriter, request *http.Request) {
 		r := NewRequest(request, w)
 		r.Log("[%s] %s", request.Method, request.URL.Path)
@@ -154,16 +156,16 @@ func FixedJsonResponse(res any) func(Request) Response {
 	return func(r Request) Response { return r.JsonResponse(res) }
 }
 
-func HTTPTemplate(filename string) func(Request) Response {
+func Template(filename string) func(Request) Response {
 	return func(r Request) Response {
 		return r.TemplateResponse(filename, nil, nil)
 	}
 }
 
-func HTTPTemplateList[C any, T Lister[T, C]](filename string, seed T) func(Request) Response {
+func TemplateList[C any, T app.Lister[T, C]](filename string, seed T) func(Request) Response {
 	return func(r Request) Response {
-		paginator := NewPaginator(r.r)
-		items, total, err := seed.List(db, paginator, seed.FilterCriteria(r.r))
+		paginator := app.NewPaginator(r.r)
+		items, total, err := seed.List(app.DB(), paginator, seed.FilterCriteria(r.r))
 		if err != nil {
 			return r.TemplateError(err)
 		}
@@ -177,7 +179,7 @@ func (r Request) TemplateError(err error) Response {
 }
 
 func Login(r Request) Response {
-	var u User
+	var u app.User
 	params, err := getHttpDecoder()(r)
 	if err != nil {
 		r.Log("Could not decode data: %s", err)
@@ -188,23 +190,22 @@ func Login(r Request) Response {
 		return r.JsonError(http.StatusUnprocessableEntity, errors, nil)
 	}
 
-	u, err = DBGetBy(r.DB, u, "email", u.Email, struct{}{})
+	u, err = app.DBGetBy(r.DB, u, "email", u.Email, struct{}{})
 	if err != nil {
 		return r.JsonGlobalError(http.StatusBadRequest, "Correu o contrasenya incorrectes", nil)
 	}
 
-	providedPassword := hashPassword(u.Salt, params["password"].(string))
-	if providedPassword != u.Password {
+	if !u.ValidPassword(params["password"].(string)) {
 		return r.JsonGlobalError(http.StatusBadRequest, "Correu o contrasenya incorrectes", nil)
 	}
 
 	// TODO make cookies more secure: https://www.calhoun.io/securing-cookies-in-go
 	s := NewSession(u.ID, r)
 	f := func(tx *sql.Tx) (err error) {
-		_, err = DBAdd(tx, s)
+		_, err = app.DBAdd(tx, s)
 		return err
 	}
-	if err := Transaction(db, f); err != nil {
+	if err := app.Transaction(app.DB(), f); err != nil {
 		return r.JsonGlobalError(http.StatusInternalServerError, "", err)
 	}
 	c := http.Cookie{
@@ -216,20 +217,20 @@ func Login(r Request) Response {
 	return getHttpReturner()(r, http.StatusOK, map[string]any{"ok": true})
 }
 
-func NewSession(userID uint, r Request) Session {
-	return Session{
-		ID:      generateRandomID(),
+func NewSession(userID uint, r Request) app.Session {
+	return app.Session{
+		ID:      app.GenerateRandomID(),
 		UserID:  userID,
-		Time:    Now(),
-		Expires: Now().Add(30 * 24 * time.Hour),
+		Time:    app.Now(),
+		Expires: app.Now().Add(30 * 24 * time.Hour),
 		IP:      r.IP(),
 		Agent:   r.Agent(),
 	}
 }
 
 func Me(r Request) Response {
-	s := Session{UserID: r.User.ID}
-	sessions, _, err := DBList(r.DB, s, nil, struct{}{})
+	s := app.Session{UserID: r.User.ID}
+	sessions, _, err := app.DBList(r.DB, s, nil, struct{}{})
 	if err != nil {
 		return r.JsonGlobalError(http.StatusInternalServerError, "", err)
 	}
@@ -250,14 +251,14 @@ func DeleteSession(r Request) Response {
 		return r.JsonGlobalError(http.StatusNotFound, "La sessió no existeix", nil)
 	}
 
-	if _, err := db.Exec("DELETE FROM sessions WHERE id=?;", id); err != nil {
+	if _, err := app.DB().Exec("DELETE FROM sessions WHERE id=?;", id); err != nil {
 		return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 	}
 
 	return r.JsonResponse(map[string]any{"ok": true})
 }
 
-func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Response {
+func Add[T app.Adder](seed func() T, options ...httpOption) func(Request) Response {
 	return func(r Request) Response {
 		decoder := getHttpDecoder(options...)
 		params, err := decoder(r)
@@ -276,7 +277,7 @@ func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Respon
 			id, err = a.Add(tx)
 			return err
 		}
-		if err := Transaction(db, f); err != nil {
+		if err := app.Transaction(app.DB(), f); err != nil {
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}
 
@@ -285,7 +286,7 @@ func HTTPAdd[T Adder](seed func() T, options ...httpOption) func(Request) Respon
 	}
 }
 
-func HTTPQueryAdd[T Adder](seed func() T, options ...httpOption) func(Request) Response {
+func QueryAdd[T app.Adder](seed func() T, options ...httpOption) func(Request) Response {
 	return func(r Request) Response {
 		decoder := getHttpDecoder(options...)
 		params, err := decoder(r)
@@ -304,7 +305,7 @@ func HTTPQueryAdd[T Adder](seed func() T, options ...httpOption) func(Request) R
 	}
 }
 
-func HTTPUpdate[T Updater](seed func() T) func(Request) Response {
+func Update[T app.Updater](seed func() T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		a := seed()
@@ -324,7 +325,7 @@ func HTTPUpdate[T Updater](seed func() T) func(Request) Response {
 			return r.JsonError(http.StatusUnprocessableEntity, errors, nil)
 		}
 
-		if err := Transaction(db, a.Update); err != nil {
+		if err := app.Transaction(app.DB(), a.Update); err != nil {
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}
 
@@ -332,7 +333,7 @@ func HTTPUpdate[T Updater](seed func() T) func(Request) Response {
 	}
 }
 
-func HTTPPatch[T Patcher](seed T) func(Request) Response {
+func Patch[T app.Patcher](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		if err != nil {
@@ -369,7 +370,7 @@ func HTTPPatch[T Patcher](seed T) func(Request) Response {
 		f := func(tx *sql.Tx) error {
 			return seed.Patch(tx, uint(id), field, value)
 		}
-		if err := Transaction(db, f); err != nil {
+		if err := app.Transaction(app.DB(), f); err != nil {
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}
 
@@ -377,7 +378,7 @@ func HTTPPatch[T Patcher](seed T) func(Request) Response {
 	}
 }
 
-func HTTPDelete[T Deleter](seed T) func(Request) Response {
+func Delete[T app.Deleter](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		if err != nil {
@@ -385,7 +386,7 @@ func HTTPDelete[T Deleter](seed T) func(Request) Response {
 		}
 
 		f := func(tx *sql.Tx) (err error) { return seed.Delete(tx, uint(id)) }
-		if err := Transaction(db, f); err != nil {
+		if err := app.Transaction(app.DB(), f); err != nil {
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}
 
@@ -393,14 +394,14 @@ func HTTPDelete[T Deleter](seed T) func(Request) Response {
 	}
 }
 
-func HTTPGet[T Getter[T]](seed T) func(Request) Response {
+func Get[T app.Getter[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
 		if err != nil {
 			return r.JsonGlobalError(http.StatusBadRequest, err.Error(), err)
 		}
 
-		a, err := seed.Get(db, uint(id))
+		a, err := seed.Get(app.DB(), uint(id))
 		if err != nil {
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}
@@ -409,9 +410,9 @@ func HTTPGet[T Getter[T]](seed T) func(Request) Response {
 	}
 }
 
-func HTTPList[C any, T Lister[T, C]](seed T) func(Request) Response {
+func List[C any, T app.Lister[T, C]](seed T) func(Request) Response {
 	return func(r Request) Response {
-		items, total, err := seed.List(db, NewPaginator(r.r), seed.FilterCriteria(r.r))
+		items, total, err := seed.List(app.DB(), app.NewPaginator(r.r), seed.FilterCriteria(r.r))
 		if err != nil {
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}
@@ -441,7 +442,7 @@ func getHttpReturner(options ...httpOption) func(Request, int, any) Response {
 	return httpJsonReturner{}.Return
 }
 
-func getHttpAuthenticator(options ...httpOption) func(Request) (*User, error) {
+func getHttpAuthenticator(options ...httpOption) func(Request) (*app.User, error) {
 	for _, option := range options {
 		if option.canAuthenticate() {
 			return option.Authenticate
@@ -467,11 +468,11 @@ func (r Request) JsonResponse(value any) JsonResponse {
 }
 
 func (r Request) JsonGlobalError(status int, msg string, err error) JsonResponse {
-	return r.JsonError(status, NewGlobalApiError(msg), err)
+	return r.JsonError(status, app.NewGlobalApiError(msg), err)
 }
 
-func (r Request) JsonError(status int, userErrors ApiErrors, err error) JsonResponse {
-	return r.jsonResponse(status, map[string]ApiErrors{"errors": userErrors}, err)
+func (r Request) JsonError(status int, userErrors app.ApiErrors, err error) JsonResponse {
+	return r.jsonResponse(status, map[string]app.ApiErrors{"errors": userErrors}, err)
 }
 
 func (r Request) jsonResponse(status int, value any, err error) JsonResponse {
@@ -512,54 +513,4 @@ func HXTriggerAfterSwap(handler func(Request) Response, event string) func(Reque
 
 		return res
 	}
-}
-
-var (
-	TEMPLATES      = make(map[string]*template.Template)
-	TEMPLATES_LOCK sync.Mutex
-
-	templateFuncs = map[string]any{
-		"dict": func(values ...any) (map[string]any, error) {
-			if len(values)%2 != 0 {
-				return nil, fmt.Errorf("invalid dict call")
-			}
-			dict := make(map[string]any, len(values)/2)
-			for i := 0; i < len(values); i += 2 {
-				key, ok := values[i].(string)
-				if !ok {
-					return nil, fmt.Errorf("dict keys must be strings")
-				}
-				dict[key] = values[i+1]
-			}
-			return dict, nil
-		},
-	}
-)
-
-func getTemplate(filename string) *template.Template {
-	TEMPLATES_LOCK.Lock()
-	defer TEMPLATES_LOCK.Unlock()
-	return TEMPLATES[filename]
-}
-
-func initTemplates(templateFiles embed.FS, userTemplateFuncs map[string]any) error {
-	TEMPLATES_LOCK.Lock()
-	defer TEMPLATES_LOCK.Unlock()
-
-	files, err := templateFiles.ReadDir("templates")
-	if err != nil {
-		return fmt.Errorf("could not read dir: %w", err)
-	}
-
-	funcs := MergeMaps(templateFuncs, userTemplateFuncs)
-	for _, f := range files {
-		name := f.Name()
-		tmpl, err := template.New(name).Funcs(funcs).ParseFS(templateFiles, "templates/layout.html", "templates/"+name)
-		if err != nil {
-			return fmt.Errorf("could not parse template %s: %w", name, err)
-		}
-		TEMPLATES[name] = tmpl
-	}
-
-	return nil
 }
