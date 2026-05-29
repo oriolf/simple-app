@@ -1,4 +1,4 @@
-package app
+package db
 
 import (
 	"database/sql"
@@ -7,14 +7,27 @@ import (
 	"sort"
 
 	_ "github.com/mattn/go-sqlite3"
+	app "github.com/oriolf/simple-app"
+	"github.com/oriolf/simple-app/types"
 )
 
 //go:embed migrations
 var simpleMigrations embed.FS
 
+var db *sql.DB
+
 func DB() *sql.DB { return db }
 
-func initSQL(migrationFiles embed.FS, dataFolder ...string) (*sql.DB, error) {
+func InitDB(migrationFiles embed.FS, dataFolder ...string) app.Option {
+	return func() (err error) {
+		if db, err = initDB(migrationFiles, dataFolder...); err != nil {
+			return fmt.Errorf("could not initialize sql: %w", err)
+		}
+		return nil
+	}
+}
+
+func initDB(migrationFiles embed.FS, dataFolder ...string) (*sql.DB, error) {
 	path := "db.db"
 	if dataFolder != nil && len(dataFolder) > 0 && dataFolder[0] != "" {
 		path = dataFolder[0] + "/" + path
@@ -42,7 +55,7 @@ func initSQL(migrationFiles embed.FS, dataFolder ...string) (*sql.DB, error) {
 	return db, nil
 }
 
-func migrateFiles(db *sql.DB, app string, migrationFiles embed.FS) error {
+func migrateFiles(db *sql.DB, application string, migrationFiles embed.FS) error {
 	const folder = "migrations"
 	files, err := migrationFiles.ReadDir(folder)
 	if err != nil {
@@ -56,7 +69,7 @@ func migrateFiles(db *sql.DB, app string, migrationFiles embed.FS) error {
 			return fmt.Errorf("could not read migration file %s: %w", file.Name(), err)
 		}
 
-		err = migrateFile(db, app, file.Name(), string(b))
+		err = migrateFile(db, application, file.Name(), string(b))
 		if err != nil {
 			return fmt.Errorf("could not execute migration file %s: %w", file.Name(), err)
 		}
@@ -65,8 +78,8 @@ func migrateFiles(db *sql.DB, app string, migrationFiles embed.FS) error {
 	return nil
 }
 
-func migrateFile(db *sql.DB, app, filename, contents string) error {
-	return Transaction(db, func(tx *sql.Tx) error {
+func migrateFile(db *sql.DB, application, filename, contents string) error {
+	return transaction(db, func(tx *sql.Tx) error {
 		var count int
 		err := db.QueryRow("SELECT COUNT(1) FROM sqlite_master WHERE name='migrations';").Scan(&count)
 		if err != nil {
@@ -74,7 +87,7 @@ func migrateFile(db *sql.DB, app, filename, contents string) error {
 		}
 
 		if count > 0 {
-			err := db.QueryRow("SELECT COUNT(1) FROM migrations WHERE app=? AND name=?;", app, filename).Scan(&count)
+			err := db.QueryRow("SELECT COUNT(1) FROM migrations WHERE app=? AND name=?;", application, filename).Scan(&count)
 			if err != nil {
 				return fmt.Errorf("could not check if previous migration exists: %w", err)
 			}
@@ -85,7 +98,7 @@ func migrateFile(db *sql.DB, app, filename, contents string) error {
 				return fmt.Errorf("could not execute migration: %w", err)
 			}
 
-			if _, err := db.Exec("INSERT INTO migrations (app, name, time) VALUES (?, ?, ?);", app, filename, Now()); err != nil {
+			if _, err := db.Exec("INSERT INTO migrations (app, name, time) VALUES (?, ?, ?);", application, filename, types.Now()); err != nil {
 				return fmt.Errorf("could not set migration as executed: %w", err)
 			}
 		}
@@ -94,7 +107,11 @@ func migrateFile(db *sql.DB, app, filename, contents string) error {
 	})
 }
 
-func Transaction(db *sql.DB, f func(*sql.Tx) error) error {
+func Transaction(f func(*sql.Tx) error) error {
+	return transaction(db, f)
+}
+
+func transaction(db *sql.DB, f func(*sql.Tx) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		tx.Rollback()
@@ -114,7 +131,7 @@ func Transaction(db *sql.DB, f func(*sql.Tx) error) error {
 	return nil
 }
 
-func QueryDB[T any](db *sql.DB, scanFunc func(rows *sql.Rows) (T, error), stmt string, args ...any) ([]T, error) {
+func QueryDB[T any](scanFunc func(rows *sql.Rows) (T, error), stmt string, args ...any) ([]T, error) {
 	rows, err := db.Query(stmt, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
@@ -141,7 +158,6 @@ func QueryDB[T any](db *sql.DB, scanFunc func(rows *sql.Rows) (T, error), stmt s
 }
 
 func QueryJoinDB[T SQLJoinMerger[T]](
-	db *sql.DB,
 	scanFunc func(rows *sql.Rows) (T, error),
 	stmt string,
 	args ...any,
@@ -188,84 +204,4 @@ func QueryJoinDB[T SQLJoinMerger[T]](
 	})
 
 	return list, nil
-}
-
-func DBAdd[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
-	res, err := m.SQLInsert(tx)
-	if err != nil {
-		return 0, fmt.Errorf("could not insert: %w", err)
-	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("could not get last id: %w", err)
-	}
-	return uint(id), nil
-}
-
-func DBGet[C any, T SQLGetter[T, C]](db *sql.DB, m T, id uint, criteria C) (T, error) {
-	items, err := QueryDB(db, m.Scan, m.SelectSQL(criteria)+" WHERE id=?;", id)
-	if err != nil {
-		return m, fmt.Errorf("could not select: %w", err)
-	}
-	if len(items) == 0 {
-		return m, fmt.Errorf("item not found")
-	}
-	return items[0], nil
-}
-
-func DBGetBy[C any, T SQLGetter[T, C]](db *sql.DB, m T, field string, id any, criteria C) (T, error) {
-	items, err := QueryDB(db, m.Scan, m.SelectSQL(criteria)+" WHERE "+field+"=?;", id)
-	if err != nil {
-		return m, fmt.Errorf("could not select: %w", err)
-	}
-	if len(items) == 0 {
-		return m, fmt.Errorf("item not found")
-	}
-	return items[0], nil
-}
-
-func DBList[C any, T SQLLister[T, C]](db *sql.DB, m T, paginator Paginator, criteria C) (items []T, total uint, err error) {
-	params := m.SQLParams(criteria)
-	row := db.QueryRow(m.CountSQL(criteria), params...)
-	if err := row.Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("could not count: %w", err)
-	}
-
-	sql := m.SelectSQL(criteria) + m.OrderSQL(criteria)
-	if paginator != nil {
-		sql = sql + "LIMIT ? OFFSET ?;"
-		limit, offset := paginator.Limit(), paginator.Offset()
-		params = append(params, limit, offset)
-		items, err = QueryDB(db, m.Scan, sql, params...)
-	} else {
-		items, err = QueryDB(db, m.Scan, sql+";", params...)
-	}
-
-	if err != nil {
-		return nil, 0, fmt.Errorf("could not select: %w", err)
-	}
-
-	return items, total, nil
-}
-
-func DBListJoin[C any, T SQLJoinLister[T, C]](db *sql.DB, m T, paginator Paginator, criteria C) (items []T, total uint, err error) {
-	row := db.QueryRow(m.CountSQL(criteria))
-	if err := row.Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("could not count: %w", err)
-	}
-
-	sql := m.SelectSQL(criteria) + m.OrderSQL(criteria)
-	if paginator != nil {
-		sql = sql + "LIMIT ? OFFSET ?;"
-		limit, offset := paginator.Limit(), paginator.Offset()
-		items, err = QueryJoinDB(db, m.Scan, sql, limit, offset)
-	} else {
-		items, err = QueryJoinDB(db, m.Scan, sql+";")
-	}
-
-	if err != nil {
-		return nil, 0, fmt.Errorf("could not select: %w", err)
-	}
-
-	return items, total, nil
 }

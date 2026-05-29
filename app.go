@@ -1,15 +1,12 @@
 package app
 
 import (
-	"database/sql"
-	"embed"
 	"fmt"
 
 	telegram "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 var (
-	db  *sql.DB
 	bot *telegram.BotAPI
 
 	globalErrorTranslations = map[string]string{
@@ -19,6 +16,8 @@ var (
 	TELEGRAM_CHAT int64
 )
 
+type Option func() error
+
 func Init(options ...Option) (err error) {
 	for _, opt := range options {
 		if err := opt(); err != nil {
@@ -26,15 +25,6 @@ func Init(options ...Option) (err error) {
 		}
 	}
 	return nil
-}
-
-func InitSQL(migrationFiles embed.FS, dataFolder ...string) Option {
-	return func() (err error) {
-		if db, err = initSQL(migrationFiles, dataFolder...); err != nil {
-			return fmt.Errorf("could not initialize sql: %w", err)
-		}
-		return nil
-	}
 }
 
 func InitTelegram(token string, chat int64) Option {

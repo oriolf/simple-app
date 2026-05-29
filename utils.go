@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+func ExecutePeriodically(f func(), delay, interval time.Duration) {
+	time.Sleep(delay)
+	f()
+	for range time.Tick(interval) {
+		f()
+	}
+}
+
 func InSlice[T comparable](x T, list []T) bool {
 	for _, e := range list {
 		if e == x {
@@ -27,14 +35,6 @@ func MergeMaps(a map[string]any, bs ...map[string]any) map[string]any {
 		}
 	}
 	return m
-}
-
-func ExecutePeriodically(f func(), delay, interval time.Duration) {
-	time.Sleep(delay)
-	f()
-	for range time.Tick(interval) {
-		f()
-	}
 }
 
 func Max[T any](s []T, greater func(T, T) bool) T {

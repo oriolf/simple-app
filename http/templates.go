@@ -71,3 +71,21 @@ func initTemplates(templateFiles embed.FS, userTemplateFuncs map[string]any) err
 
 	return nil
 }
+
+func Template(filename string) func(Request) Response {
+	return func(r Request) Response {
+		return r.TemplateResponse(filename, nil, nil)
+	}
+}
+
+func TemplateList[C any, T app.Lister[T, C]](filename string, seed T) func(Request) Response {
+	return func(r Request) Response {
+		paginator := app.NewPaginator(r.MustParameters())
+		items, total, err := seed.List(paginator, seed.FilterCriteria(r.MustParameters()))
+		if err != nil {
+			return r.TemplateError(err)
+		}
+		paginator.SetTotal(total)
+		return r.TemplateResponse(filename, map[string]any{"items": items, "total": total, "paginator": paginator}, nil)
+	}
+}

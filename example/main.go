@@ -9,7 +9,10 @@ import (
 
 	app "github.com/oriolf/simple-app"
 	"github.com/oriolf/simple-app/cli"
+	"github.com/oriolf/simple-app/db"
 	"github.com/oriolf/simple-app/http"
+	"github.com/oriolf/simple-app/users"
+	"github.com/oriolf/simple-app/validators"
 )
 
 //go:embed migrations
@@ -26,7 +29,7 @@ func main() {
 		app.RegisterErrorTranslations(
 			map[string]string{"UNIQUE constraint failed: members.nif": "Ja existeix un soci amb aquest DNI"},
 		),
-		app.InitSQL(migrationFiles),
+		db.InitDB(migrationFiles),
 		http.InitTemplates(templateFiles),
 	)
 	if err != nil {
@@ -43,10 +46,10 @@ func main() {
 			{Name: "add", Handler: cli.Add(MemberFactory)},
 		}},
 		cli.Command{Name: "user", Commands: []cli.Command{
-			{Name: "add", Handler: cli.Add(app.SuperUserFactory)},
+			{Name: "add", Handler: cli.Add(users.SuperUserFactory)},
 		}},
 		cli.Command{Name: "types", Commands: []cli.Command{
-			{Name: "generate", Handler: app.GenerateTypescriptTypes(app.User{}, app.Session{}, Member{})},
+			{Name: "generate", Handler: cli.GenerateTypescriptTypes(users.User{}, users.Session{}, Member{})},
 		}},
 	)
 }
@@ -56,7 +59,7 @@ func httpHandlers([]string) []string {
 	http.Handle("GET /api/ok", http.FixedJsonResponse(map[string]bool{"ok": true}))
 	http.Handle("POST /api/login", http.Login)
 
-	group := http.Group(http.DefaultAuthentication)
+	group := http.Group(http.UserAuthentication)
 	group.Handle("GET /api/me", http.Me)
 	group.Handle("DELETE /api/sessions/{id}", http.DeleteSession)
 	group.Handle("GET /api/members", http.List(Member{}))
@@ -70,8 +73,8 @@ func httpHandlers([]string) []string {
 
 	// HTML + HTMX
 	http.Handle("GET /{$}", http.TemplateList("index.html", Member{}))
-	http.Handle("DELETE /members/{id}", http.HXTriggerAfterSwap(http.Delete(Member{}), "members-updated"))
-	http.Handle("POST /members", http.HXTriggerAfterSwap(http.Add(MemberFactory), "members-updated"))
+	http.Handle("DELETE /members/{id}", http.Delete(Member{}), http.HXTriggerAfterSwap("members-updated"))
+	http.Handle("POST /members", http.Add(MemberFactory), http.HXTriggerAfterSwap("members-updated"))
 	http.Handle("GET /members/{id}/patch-field/{field}", HTTPMemberGetEditField)
 
 	// Static
@@ -90,7 +93,7 @@ func HTTPMemberGetEditField(r http.Request) http.Response {
 		return r.TemplateError(fmt.Errorf("Unknown field"))
 	}
 
-	member, err := app.DBGet(r.DB, Member{}, uint(id), memberFilterCriteria{})
+	member, err := db.Get(Member{}, uint(id), memberFilterCriteria{})
 	if err != nil {
 		return r.TemplateError(err)
 	}
@@ -99,7 +102,7 @@ func HTTPMemberGetEditField(r http.Request) http.Response {
 }
 
 func seedE2E([]string) []string {
-	user := app.SuperUserFactory()
+	user := users.SuperUserFactory()
 	user.Validate(map[string]any{
 		"email":    "usuari@example.com",
 		"password": "usuariusuari",
@@ -108,10 +111,10 @@ func seedE2E([]string) []string {
 		user.Add(tx)
 		return nil
 	}
-	app.Transaction(app.DB(), f)
+	db.Transaction(f)
 	return []string{}
 }
 
 func validateDNI(args []string) []string {
-	return []string{app.ComputeSpanishDNIControlCharacter(args[0])}
+	return []string{validators.ComputeSpanishDNIControlCharacter(args[0])}
 }

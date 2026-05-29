@@ -1,45 +1,16 @@
 package cli
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"strings"
-
-	app "github.com/oriolf/simple-app"
 )
 
 type Command struct {
 	Name     string
 	Handler  func([]string) []string
 	Commands []Command
-}
-
-func Add[T app.Adder](seed func() T) func([]string) []string {
-	return func(args []string) []string {
-		a := seed()
-
-		params, err := parseCliParams(args)
-		if err != nil {
-			return []string{err.Error()}
-		}
-
-		if errors := a.Validate(params); errors.NotEmpty() {
-			return append([]string{"There are errors in the parameters:"}, errors.FormatForCli()...)
-		}
-
-		var id uint
-		f := func(tx *sql.Tx) (err error) {
-			id, err = a.Add(tx)
-			return err
-		}
-		if err := app.Transaction(app.DB(), f); err != nil {
-			return []string{fmt.Sprintf("Could not add from cli: %s", app.TranslateError(err.Error()))}
-		}
-
-		return []string{fmt.Sprintf("Created entity with ID %d", id)}
-	}
 }
 
 func Execute(commands ...Command) {

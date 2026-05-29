@@ -4,20 +4,22 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"fmt"
-	"net/http"
 	"strings"
 
 	app "github.com/oriolf/simple-app"
-	httpapi "github.com/oriolf/simple-app/http"
+	"github.com/oriolf/simple-app/db"
+	"github.com/oriolf/simple-app/http"
+	"github.com/oriolf/simple-app/types"
+	"github.com/oriolf/simple-app/validators"
 )
 
 type Member struct {
-	ID       uint      `json:"id"`
-	Name     string    `json:"name"`
-	NIF      string    `json:"nif"`
-	JoinedOn app.Date  `json:"joined_on"`
-	LeftOn   *app.Date `json:"left_on"`
-	IBAN     *string   `json:"iban"`
+	ID       uint        `json:"id"`
+	Name     string      `json:"name"`
+	NIF      string      `json:"nif"`
+	JoinedOn types.Date  `json:"joined_on"`
+	LeftOn   *types.Date `json:"left_on"`
+	IBAN     *string     `json:"iban"`
 }
 
 func MemberFactory() *Member { return &Member{} }
@@ -27,7 +29,7 @@ func MemberFactory() *Member { return &Member{} }
 func (m *Member) SetID(id uint) { m.ID = id }
 
 func (m *Member) Validate(params map[string]any) app.ApiErrors {
-	v := app.NewValidator(params)
+	v := validators.NewValidator(params)
 	m.Name = v.ValidateStringNonEmpty("name")
 	m.NIF = v.ValidateSpanishDNI("nif")
 	m.JoinedOn = v.ValidateDate("joined_on")
@@ -38,7 +40,7 @@ func (m *Member) Validate(params map[string]any) app.ApiErrors {
 
 func (m Member) ValidatePatch(field string, value any) (string, any, app.ApiErrors) {
 	var res any
-	v := app.NewValidator(map[string]any{field: value})
+	v := validators.NewValidator(map[string]any{field: value})
 	switch field {
 	case "name":
 		res = v.ValidateStringNonEmpty(field)
@@ -54,7 +56,7 @@ func (m Member) ValidatePatch(field string, value any) (string, any, app.ApiErro
 }
 
 func (m Member) Add(tx *sql.Tx) (uint, error) {
-	return app.DBAdd(tx, m)
+	return db.Add(tx, m)
 }
 
 func (m Member) Update(tx *sql.Tx) error {
@@ -69,16 +71,15 @@ func (m Member) Patch(tx *sql.Tx, id uint, field string, value any) error {
 	return m.SQLPatch(tx, id, field, value)
 }
 
-func (m Member) Get(db *sql.DB, id uint) (Member, error) {
-	return app.DBGet(db, m, id, memberFilterCriteria{})
+func (m Member) Get(id uint) (Member, error) {
+	return db.Get(m, id, memberFilterCriteria{})
 }
 
 func (m Member) List(
-	db *sql.DB,
 	paginator app.Paginator,
 	criteria memberFilterCriteria,
 ) (members []Member, total uint, err error) {
-	return app.DBList(db, m, paginator, criteria)
+	return db.List(m, paginator, criteria)
 }
 
 // HTTP methods
@@ -86,10 +87,8 @@ type memberFilterCriteria struct {
 	search string
 }
 
-func (m Member) FilterCriteria(r *http.Request) memberFilterCriteria {
-	return memberFilterCriteria{
-		search: r.FormValue("search"),
-	}
+func (m Member) FilterCriteria(params map[string]any) memberFilterCriteria {
+	return memberFilterCriteria{search: params["search"].(string)}
 }
 
 // SQL methods
@@ -149,7 +148,7 @@ type importMembersParams struct {
 	CSV            string `json:"csv"`
 }
 
-func importMembers(r httpapi.Request) httpapi.Response {
+func importMembers(r http.Request) http.Response {
 	var params importMembersParams
 	if err := r.DecodeJsonBody(&params); err != nil {
 		r.Log("Could not decode data: %s", err)
@@ -204,9 +203,9 @@ func importMembers(r httpapi.Request) httpapi.Response {
 
 		return nil
 	}
-	if err := app.Transaction(app.DB(), f); err != nil {
-		return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
+	if err := db.Transaction(f); err != nil {
+		return r.JsonInternalError(err.Error(), err)
 	}
 
-	return httpapi.JsonReturner().Return(r, http.StatusOK, map[string]any{"results": results})
+	return r.JsonResponse(map[string]any{"results": results})
 }
