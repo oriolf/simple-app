@@ -160,10 +160,7 @@ func Get[T app.Getter[T]](seed T) func(Request) Response {
 
 func List[C any, T app.Lister[T, C]](seed T) func(Request) Response {
 	return func(r Request) Response {
-		items, total, err := seed.List(
-			app.NewPaginator(r.MustParameters()),
-			seed.FilterCriteria(r.MustParameters()),
-		)
+		items, total, err := seed.List(app.NewPaginator(r.MustParameters()), getFilterCriteria(r, seed))
 		if err != nil {
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}

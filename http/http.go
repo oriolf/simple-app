@@ -5,6 +5,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+
+	app "github.com/oriolf/simple-app"
 )
 
 var (
@@ -89,4 +91,11 @@ func Handle(url string, handler func(Request) Response, options ...option) {
 
 		r.Log("[%d] %s", res.Status(), r.took())
 	})
+}
+
+func getFilterCriteria[C any, T app.Lister[T, C]](r Request, seed T) C {
+	if criterier, ok := app.Lister[T, C](seed).(app.FilterCriterier[C]); ok {
+		return criterier.FilterCriteria(r.MustParameters())
+	}
+	return *new(C)
 }

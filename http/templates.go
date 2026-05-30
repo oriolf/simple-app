@@ -81,7 +81,7 @@ func Template(filename string) func(Request) Response {
 func TemplateList[C any, T app.Lister[T, C]](filename string, seed T) func(Request) Response {
 	return func(r Request) Response {
 		paginator := app.NewPaginator(r.MustParameters())
-		items, total, err := seed.List(paginator, seed.FilterCriteria(r.MustParameters()))
+		items, total, err := seed.List(paginator, getFilterCriteria(r, seed))
 		if err != nil {
 			return r.TemplateError(err)
 		}

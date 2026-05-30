@@ -55,17 +55,9 @@ func (m Member) ValidatePatch(field string, value any) (string, any, app.ApiErro
 	return field, res, v.Errors()
 }
 
-func (m Member) Add(tx *sql.Tx) (uint, error) {
-	return db.Add(tx, m)
-}
-
-func (m Member) Update(tx *sql.Tx) error {
-	return m.SQLUpdate(tx)
-}
-
-func (m Member) Delete(tx *sql.Tx, id uint) error {
-	return m.SQLDelete(tx, id)
-}
+func (m Member) Add(tx *sql.Tx) (uint, error)     { return db.Add(tx, m) }
+func (m Member) Update(tx *sql.Tx) error          { return m.SQLUpdate(tx) }
+func (m Member) Delete(tx *sql.Tx, id uint) error { return m.SQLDelete(tx, id) }
 
 func (m Member) Patch(tx *sql.Tx, id uint, field string, value any) error {
 	return m.SQLPatch(tx, id, field, value)
@@ -75,11 +67,8 @@ func (m Member) Get(id uint) (Member, error) {
 	return db.Get(m, id, memberFilterCriteria{})
 }
 
-func (m Member) List(
-	paginator app.Paginator,
-	criteria memberFilterCriteria,
-) (members []Member, total uint, err error) {
-	return db.List(m, paginator, criteria)
+func (m Member) List(p app.Paginator, c memberFilterCriteria) ([]Member, uint, error) {
+	return db.List(m, p, c)
 }
 
 // HTTP methods
@@ -103,39 +92,42 @@ func (m Member) SQLUpdate(tx *sql.Tx) error {
 	return err
 }
 
-func (m Member) SQLDelete(tx *sql.Tx, id uint) error {
-	_, err := tx.Exec("DELETE FROM members WHERE id=?;", id)
-	return err
-}
-
 func (m Member) SQLPatch(tx *sql.Tx, id uint, field string, value any) error {
 	sql := fmt.Sprintf("UPDATE members SET %s=? WHERE id=?;", field)
 	_, err := tx.Exec(sql, value, id)
 	return err
 }
 
-func (Member) Scan(rows *sql.Rows) (m Member, err error) {
-	return m, rows.Scan(&m.ID, &m.Name, &m.NIF, &m.JoinedOn, &m.LeftOn, &m.IBAN)
+func (m Member) SQLDelete(tx *sql.Tx, id uint) error {
+	_, err := tx.Exec("DELETE FROM members WHERE id=?;", id)
+	return err
 }
 
 func (m Member) SelectSQL(criteria memberFilterCriteria) string {
 	return "SELECT id, name, nif, joined_on, left_on, iban FROM members " + m.whereSQL(criteria)
 }
+
+func (Member) OrderSQL(criteria memberFilterCriteria) string { return "ORDER BY joined_on DESC " }
+
+func (Member) Scan(rows *sql.Rows) (m Member, err error) {
+	return m, rows.Scan(&m.ID, &m.Name, &m.NIF, &m.JoinedOn, &m.LeftOn, &m.IBAN)
+}
+
 func (m Member) CountSQL(criteria memberFilterCriteria) string {
 	return "SELECT COUNT(1) FROM members" + m.whereSQL(criteria) + ";"
 }
+
 func (Member) whereSQL(criteria memberFilterCriteria) string {
 	if criteria.search != "" {
-		return " WHERE (name LIKE ? OR nif LIKE ?)"
+		return " WHERE (name LIKE @search OR nif LIKE @search)"
 	}
 	return ""
 }
 
-func (Member) OrderSQL(criteria memberFilterCriteria) string { return "ORDER BY joined_on DESC " }
-func (Member) SQLParams(criteria memberFilterCriteria) []any {
+func (Member) SQLWhereCriteriaParams(criteria memberFilterCriteria) []any {
 	if criteria.search != "" {
 		search := "%" + criteria.search + "%"
-		return []any{search, search}
+		return []any{sql.Named("search", search)}
 	}
 	return nil
 }

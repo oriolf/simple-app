@@ -42,13 +42,17 @@ func GetBy[C any, T SQLGetter[T, C]](m T, field string, id any, criteria C) (T, 
 }
 
 func List[C any, T SQLLister[T, C]](m T, paginator app.Paginator, criteria C) (items []T, total uint, err error) {
-	params := m.SQLParams(criteria)
+	params := getListParams(m, criteria)
 	row := db.QueryRow(m.CountSQL(criteria), params...)
 	if err := row.Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("could not count: %w", err)
 	}
 
-	sql := m.SelectSQL(criteria) + m.OrderSQL(criteria)
+	sql := m.SelectSQL(criteria)
+	if orderer, ok := SQLLister[T, C](m).(SQLOrderer[C]); ok {
+		sql += orderer.OrderSQL(criteria)
+	}
+
 	if paginator != nil {
 		sql = sql + "LIMIT ? OFFSET ?;"
 		limit, offset := paginator.Limit(), paginator.Offset()
@@ -65,13 +69,28 @@ func List[C any, T SQLLister[T, C]](m T, paginator app.Paginator, criteria C) (i
 	return items, total, nil
 }
 
+func getListParams[C any, T SQLLister[T, C]](m T, criteria C) []any {
+	if paramer, ok := SQLLister[T, C](m).(SQLWhereCriteriaParamer[C]); ok {
+		return paramer.SQLWhereCriteriaParams(criteria)
+	}
+	if paramer, ok := SQLLister[T, C](m).(SQLWhereParamer); ok {
+		return paramer.SQLWhereParams()
+	}
+
+	return []any{}
+}
+
 func ListJoin[C any, T SQLJoinLister[T, C]](m T, paginator app.Paginator, criteria C) (items []T, total uint, err error) {
 	row := db.QueryRow(m.CountSQL(criteria))
 	if err := row.Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("could not count: %w", err)
 	}
 
-	sql := m.SelectSQL(criteria) + m.OrderSQL(criteria)
+	sql := m.SelectSQL(criteria)
+	if orderer, ok := SQLLister[T, C](m).(SQLOrderer[C]); ok {
+		sql += orderer.OrderSQL(criteria)
+	}
+
 	if paginator != nil {
 		sql = sql + "LIMIT ? OFFSET ?;"
 		limit, offset := paginator.Limit(), paginator.Offset()

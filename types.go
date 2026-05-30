@@ -73,6 +73,9 @@ type Getter[T any] interface {
 
 type Lister[T, C any] interface {
 	List(Paginator, C) ([]T, uint, error)
+}
+
+type FilterCriterier[C any] interface {
 	FilterCriteria(map[string]any) C
 }
 
@@ -97,8 +100,13 @@ type paginator struct {
 }
 
 func NewPaginator(params map[string]any) *paginator {
-	page, _ := strconv.Atoi(params["page"].(string))
-	itemsPerPage, _ := strconv.Atoi(params["itemsPerPage"].(string))
+	page, itemsPerPage := 0, 0
+	if pageAny, ok := params["page"]; ok {
+		page, _ = strconv.Atoi(pageAny.(string))
+	}
+	if itemsAny, ok := params["itemsPerPage"]; ok {
+		itemsPerPage, _ = strconv.Atoi(itemsAny.(string))
+	}
 	if page <= 0 {
 		page = 0
 	}

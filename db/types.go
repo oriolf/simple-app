@@ -16,18 +16,20 @@ type SQLUpdater interface {
 	SQLUpdate(*sql.Tx) error
 }
 
-type SQLParamer[C any] interface {
-	SQLParams(C) []any
+type SQLWhereParamer interface {
+	SQLWhereParams() []any
+}
+
+type SQLWhereCriteriaParamer[C any] interface {
+	SQLWhereCriteriaParams(C) []any
 }
 
 type SQLSelecter[C any] interface {
 	SelectSQL(C) string
-	SQLParamer[C]
 }
 
 type SQLCounter[C any] interface {
 	CountSQL(C) string
-	SQLParamer[C]
 }
 
 type SQLOrderer[C any] interface {
@@ -43,7 +45,6 @@ type SQLLister[T, C any] interface {
 	Scanner[T]
 	SQLSelecter[C]
 	SQLCounter[C]
-	SQLOrderer[C]
 }
 
 type SQLJoinMerger[T any] interface {

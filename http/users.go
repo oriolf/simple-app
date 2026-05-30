@@ -39,7 +39,7 @@ func Login(r Request) Response {
 		return r.JsonGlobalError(http.StatusBadRequest, "Correu o contrasenya incorrectes", nil)
 	}
 
-	if !u.ValidPassword(params["password"].(string)) {
+	if !u.CorrectPassword(params["password"].(string)) {
 		return r.JsonGlobalError(http.StatusBadRequest, "Correu o contrasenya incorrectes", nil)
 	}
 
