@@ -5,6 +5,8 @@ import (
 	"strconv"
 )
 
+type Command interface{}
+
 type ApiErrors struct {
 	Global []string            `json:"global"`
 	Fields map[string][]string `json:"fields"`
@@ -77,6 +79,10 @@ type Lister[T, C any] interface {
 
 type FilterCriterier[C any] interface {
 	FilterCriteria(map[string]any) C
+}
+
+type Commander[T any] interface {
+	SeedEntity() T
 }
 
 type Paginator interface {

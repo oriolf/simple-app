@@ -171,3 +171,20 @@ func List[C any, T app.Lister[T, C]](seed T) func(Request) Response {
 		})
 	}
 }
+
+func ExecuteCommand[T any](command app.Commander[T]) func(Request) Response {
+	return func(r Request) Response {
+		// seed actual command and entity
+		// recover previous events from entity and hydrate it
+		// execute command to entity; if api errors return them
+		// if not, save domain event
+		f := func(tx *sql.Tx) (err error) {
+			return nil
+		}
+		if err := db.Transaction(f); err != nil {
+			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
+		}
+
+		return r.JsonResponse(map[string]any{"ok": true})
+	}
+}

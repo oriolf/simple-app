@@ -39,7 +39,7 @@ func (r Request) Agent() string                 { return r.r.UserAgent() }
 
 func (r Request) Log(msg string, args ...any) {
 	args = append([]any{r.id}, args...)
-	log.Printf("[%04d] "+msg+"\n", args...)
+	log.Printf("[%05d] "+msg+"\n", args...)
 }
 
 func (r Request) MustParameters() map[string]any {
