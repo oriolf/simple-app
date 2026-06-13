@@ -1,21 +1,24 @@
 package valueobjects
 
-type EntityVersion uint
-
-func NewEntityVersion() EntityVersion { return EntityVersion(1) }
-
-func (v EntityVersion) Increment() EntityVersion { return EntityVersion(v + 1) }
+import (
+	"github.com/oriolf/simple-app/types"
+	"github.com/oriolf/simple-app/validators"
+)
 
 type Name string
 
-// TODO should be able to «use» validators, extending them, without validators
-// knowing about all the existing value objects
-func NewName(s string) Name {
+func NewName(validator validators.Validator, field string) Name {
+	s := validator.ValidateStringNonEmpty(field)
 	return Name(s)
 }
 
-type DNI string
+type NIF string
 
-func NewDNI(s string) DNI {
-	return DNI(s)
+func NewNIF(validator validators.Validator, field string) NIF {
+	s := validator.ValidateSpanishDNI(field)
+	return NIF(s)
+}
+
+func NewDate(validator validators.Validator, field string) types.Date {
+	return validator.ValidateDate(field)
 }

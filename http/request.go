@@ -90,6 +90,10 @@ func (r Request) parseParameters() (map[string]any, error) {
 	return params, nil
 }
 
+func (r Request) TypedParameters(params any) error {
+	return r.DecodeJsonBody(&params)
+}
+
 func (r Request) DecodeJsonBody(target any) error {
 	decoder := json.NewDecoder(r.r.Body)
 	return decoder.Decode(target)

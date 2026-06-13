@@ -9,7 +9,7 @@ import (
 	"github.com/oriolf/simple-app/types"
 )
 
-func (v *validator) ValidateDate(field string) types.Date {
+func (v *Validator) ValidateDate(field string) types.Date {
 	s := v.validateStringPresent(field)
 	if v.HasError(field) {
 		return types.Date{}

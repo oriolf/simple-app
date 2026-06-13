@@ -24,8 +24,8 @@ func InSlice[T comparable](x T, list []T) bool {
 	return false
 }
 
-func MergeMaps(a map[string]any, bs ...map[string]any) map[string]any {
-	m := make(map[string]any)
+func MergeMaps[T any](a map[string]T, bs ...map[string]T) map[string]T {
+	m := make(map[string]T)
 	for k, v := range a {
 		m[k] = v
 	}
@@ -37,6 +37,21 @@ func MergeMaps(a map[string]any, bs ...map[string]any) map[string]any {
 	return m
 }
 
+func SafeGetString(a map[string]any, key string) string {
+	if a == nil {
+		return ""
+	}
+	x, ok := a[key]
+	if !ok {
+		return ""
+	}
+	s, ok := x.(string)
+	if !ok {
+		return ""
+	}
+	return s
+}
+
 func Max[T any](s []T, greater func(T, T) bool) T {
 	max := s[0]
 	for _, x := range s {
@@ -45,6 +60,10 @@ func Max[T any](s []T, greater func(T, T) bool) T {
 		}
 	}
 	return max
+}
+
+func Last[T any](s []T) T {
+	return s[len(s)-1]
 }
 
 func Map[T, R any](s []T, f func(T) R) (out []R) {

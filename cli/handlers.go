@@ -72,7 +72,6 @@ func getTypescriptType(t reflect.Type) string {
 		return getTypescriptType(t.Elem()) + "|null"
 	}
 	if t.Kind() == reflect.Struct {
-		// TODO better define date and date time types, compatible with typescript
 		if app.InSlice(t.Name(), []string{"Date", "DateTime"}) {
 			return "string"
 		}

@@ -20,7 +20,6 @@ var (
 
 func Serve() error {
 	http.HandleFunc("OPTIONS /", func(w http.ResponseWriter, request *http.Request) {
-		// TODO make it configurable
 		for k, v := range defaultHeaders {
 			w.Header().Add(k, v)
 		}
@@ -66,7 +65,6 @@ func Handle(url string, handler func(Request) Response, options ...option) {
 		r := NewRequest(request, w)
 		r.Log("[%s] %s", request.Method, request.URL.Path)
 
-		// TODO make it configurable
 		for k, v := range defaultHeaders {
 			w.Header().Add(k, v)
 		}

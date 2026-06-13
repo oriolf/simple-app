@@ -31,7 +31,7 @@ var spanishDNIControlCharacters = []string{
 	"E",
 }
 
-func (v *validator) ValidateSpanishDNI(field string) string {
+func (v *Validator) ValidateSpanishDNI(field string) string {
 	value := v.validateStringPresent(field)
 	if v.HasError(field) {
 		return value

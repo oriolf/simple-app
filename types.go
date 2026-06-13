@@ -2,10 +2,12 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"strconv"
+	"strings"
 )
 
-type Command interface{}
+var ConcurrencyError = errors.New("Concurrency error")
 
 type ApiErrors struct {
 	Global []string            `json:"global"`
@@ -16,12 +18,20 @@ func NewGlobalApiError(msg string) ApiErrors {
 	return ApiErrors{Global: []string{msg}}
 }
 
+func NewFieldApiError(field, msg string) ApiErrors {
+	return ApiErrors{Fields: map[string][]string{field: []string{msg}}}
+}
+
 func (e ApiErrors) Empty() bool {
 	return len(e.Global) == 0 && len(e.Fields) == 0
 }
 
 func (e ApiErrors) NotEmpty() bool {
 	return !e.Empty()
+}
+
+func (e ApiErrors) Error() string {
+	return strings.Join(e.FormatForCli(), "\n")
 }
 
 func (e ApiErrors) FormatForCli() (msgs []string) {
@@ -81,10 +91,6 @@ type FilterCriterier[C any] interface {
 	FilterCriteria(map[string]any) C
 }
 
-type Commander[T any] interface {
-	SeedEntity() T
-}
-
 type Paginator interface {
 	Limit() uint
 	Offset() uint
@@ -106,13 +112,8 @@ type paginator struct {
 }
 
 func NewPaginator(params map[string]any) *paginator {
-	page, itemsPerPage := 0, 0
-	if pageAny, ok := params["page"]; ok {
-		page, _ = strconv.Atoi(pageAny.(string))
-	}
-	if itemsAny, ok := params["itemsPerPage"]; ok {
-		itemsPerPage, _ = strconv.Atoi(itemsAny.(string))
-	}
+	page, _ := strconv.Atoi(SafeGetString(params, "page"))
+	itemsPerPage, _ := strconv.Atoi(SafeGetString(params, "itemsPerPage"))
 	if page <= 0 {
 		page = 0
 	}

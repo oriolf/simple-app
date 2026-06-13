@@ -8,26 +8,35 @@ import (
 	app "github.com/oriolf/simple-app"
 )
 
-type validator struct {
+type Validator struct {
 	errors app.ApiErrors
 	params map[string]any
 }
 
-func NewValidator(params map[string]any) validator {
-	return validator{params: params, errors: app.ApiErrors{Fields: make(map[string][]string)}}
+type Validater interface {
+	Validate() app.ApiErrors
 }
 
-func (v validator) HasError(field string) bool {
+func NewValidator(params map[string]any) Validator {
+	return Validator{params: params, errors: app.ApiErrors{Fields: make(map[string][]string)}}
+}
+
+func (v Validator) HasError(field string) bool {
 	return len(v.errors.Fields[field]) > 0
 }
 
-func (v validator) AddError(field, msg string) {
+func (v Validator) AddError(field, msg string) {
 	v.errors.Fields[field] = append(v.errors.Fields[field], msg)
 }
 
-func (v validator) Errors() app.ApiErrors { return v.errors }
+func (v *Validator) Merge(errors app.ApiErrors) {
+	v.errors.Global = append(v.errors.Global, errors.Global...)
+	v.errors.Fields = app.MergeMaps(v.errors.Fields, errors.Fields)
+}
 
-func (v *validator) validateStringPresent(field string) string {
+func (v Validator) Errors() app.ApiErrors { return v.errors }
+
+func (v *Validator) validateStringPresent(field string) string {
 	s, ok := v.params[field]
 	if !ok {
 		v.AddError(field, "El camp ha d'estar present")
@@ -41,7 +50,7 @@ func (v *validator) validateStringPresent(field string) string {
 	return ""
 }
 
-func (v *validator) validateNumberPresent(field string) float64 {
+func (v *Validator) validateNumberPresent(field string) float64 {
 	n, ok := v.params[field]
 	if !ok {
 		v.AddError(field, "El camp ha d'estar present")
@@ -62,7 +71,7 @@ func (v *validator) validateNumberPresent(field string) float64 {
 	return 0
 }
 
-func (v *validator) ValidateInt(field string) int {
+func (v *Validator) ValidateInt(field string) int {
 	value := v.validateNumberPresent(field)
 	if v.HasError(field) {
 		return 0
@@ -74,7 +83,7 @@ func (v *validator) ValidateInt(field string) int {
 	return int(value)
 }
 
-func (v *validator) ValidatePositiveInt(field string) int {
+func (v *Validator) ValidatePositiveInt(field string) int {
 	value := v.ValidateInt(field)
 	if v.HasError(field) {
 		return 0
@@ -86,7 +95,7 @@ func (v *validator) ValidatePositiveInt(field string) int {
 	return value
 }
 
-func (v *validator) ValidateStringNonEmpty(field string) string {
+func (v *Validator) ValidateStringNonEmpty(field string) string {
 	value := v.validateStringPresent(field)
 	if v.HasError(field) {
 		return ""
@@ -98,11 +107,11 @@ func (v *validator) ValidateStringNonEmpty(field string) string {
 	return value
 }
 
-func (v *validator) ValidatePassword(field string) string {
+func (v *Validator) ValidatePassword(field string) string {
 	return v.ValidateStringNonEmpty(field)
 }
 
-func (v *validator) ValidateEmail(field string) string {
+func (v *Validator) ValidateEmail(field string) string {
 	email := v.ValidateStringNonEmpty(field)
 	if v.HasError(field) {
 		return email

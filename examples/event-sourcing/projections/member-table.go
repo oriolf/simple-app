@@ -17,7 +17,7 @@ import (
 type MemberTable struct {
 	ID       types.UUID  `json:"id"`
 	Name     vo.Name     `json:"name"`
-	NIF      vo.DNI      `json:"nif"`
+	NIF      vo.NIF      `json:"nif"`
 	JoinedOn types.Date  `json:"joined_on"`
 	LeftOn   *types.Date `json:"left_on"`
 }
@@ -30,9 +30,7 @@ func (p memberTableProjecter) TableName() string { return "members_table" }
 
 func (p memberTableProjecter) Project(tx *sql.Tx, events []de.DomainEvent) error {
 	m := &entities.Member{}
-	for _, e := range events {
-		m.Hydrate(e)
-	}
+	de.Hydrate(m, events)
 
 	// TODO if projection already exists, ON CONFLICT UPDATE ...
 	sql := "INSERT INTO members_table (id, projected_on, nif, name, joined_on, left_on) VALUES (?, ?, ?, ?, ?, ?);"
@@ -50,8 +48,7 @@ type memberFilterCriteria struct {
 }
 
 func (m MemberTable) FilterCriteria(params map[string]any) memberFilterCriteria {
-	// TODO here and in simple/member.go put an util in utils.go and use it to avoid panics
-	return memberFilterCriteria{search: params["search"].(string)}
+	return memberFilterCriteria{search: app.SafeGetString(params, "search")}
 }
 
 func (m MemberTable) SelectSQL(criteria memberFilterCriteria) string {

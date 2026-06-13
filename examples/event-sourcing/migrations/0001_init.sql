@@ -1,4 +1,4 @@
-CREATE TABLE unique_member_dnis (
+CREATE TABLE unique_member_nifs (
     id              TEXT NOT NULL PRIMARY KEY,
     nif             VARCHAR(9) NOT NULL UNIQUE
 );

@@ -77,7 +77,7 @@ type memberFilterCriteria struct {
 }
 
 func (m Member) FilterCriteria(params map[string]any) memberFilterCriteria {
-	return memberFilterCriteria{search: params["search"].(string)}
+	return memberFilterCriteria{search: app.SafeGetString(params, "search")}
 }
 
 // SQL methods
