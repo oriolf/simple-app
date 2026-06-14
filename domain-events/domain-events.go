@@ -108,8 +108,11 @@ func RecordEvent(tx *sql.Tx, e DomainEvent) error {
 		return err
 	}
 
-	newEventRecorded <- struct{}{}
 	return nil
+}
+
+func InformEventRecorded() {
+	newEventRecorded <- struct{}{}
 }
 
 func Log(msg string, args ...any) {
@@ -117,10 +120,12 @@ func Log(msg string, args ...any) {
 }
 
 func project(projecter Projecter, newEvent <-chan struct{}) {
+EXECUTE_PROJECTION:
 	for {
 		resultChan := executeProjection(projecter)
 		for {
 			select {
+			// TODO change this to the sender dropping the send if it takes too long
 			case <-newEvent:
 				continue
 			case result := <-resultChan:
@@ -128,17 +133,18 @@ func project(projecter Projecter, newEvent <-chan struct{}) {
 					Log("Could not execute projection: %s", result.err)
 				}
 				if result.repeat {
-					continue
+					continue EXECUTE_PROJECTION
 				}
-				break
+				goto WAIT_NEXT_EXECUTION
 			}
 		}
 
+	WAIT_NEXT_EXECUTION:
 		select {
 		case <-time.After(1 * time.Minute):
-			continue
+			continue EXECUTE_PROJECTION
 		case <-newEvent:
-			continue
+			continue EXECUTE_PROJECTION
 		}
 	}
 }
@@ -228,6 +234,10 @@ func ScanDomainEvent(rows *sql.Rows) (de DomainEvent, err error) {
 }
 
 func Hydrate(h Hydrater, events []DomainEvent) {
+	if len(events) == 0 {
+		return
+	}
+
 	h.SetEntityID(events[0].EntityID)
 	for _, e := range events {
 		h.Hydrate(e)

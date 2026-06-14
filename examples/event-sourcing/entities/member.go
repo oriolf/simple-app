@@ -41,7 +41,11 @@ var (
 )
 
 func NewMemberCreatedEvent(command CreateMemberCommand) de.DomainEvent {
-	payload := types.NewJSON(map[string]any{"name": command.Name, "nif": command.NIF, "joined_on": command.JoinedOn})
+	payload := types.NewJSON(map[string]any{
+		"name":      command.Name,
+		"nif":       command.NIF,
+		"joined_on": command.JoinedOn,
+	})
 	return de.NewDomainEvent(memberCreatedEventName, command, payload)
 }
 

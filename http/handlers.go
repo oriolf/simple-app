@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/oriolf/simple-app/db"
 
@@ -189,7 +191,7 @@ func ExecuteCommand[R de.Command, T de.Entity](commander de.Commander[R, T]) fun
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}
 
-		concurrencyMsg := "L'entitat té una versió més recent de l'esperada"
+		concurrencyMsg := fmt.Sprintf("L'entitat %s té una versió més recent de l'esperada", command.EntityID())
 		if len(events) > 0 && app.Last(events).EntityVersion != command.ExpectedVersion() {
 			return r.JsonGlobalError(http.StatusConflict, concurrencyMsg, nil)
 		}
@@ -202,7 +204,10 @@ func ExecuteCommand[R de.Command, T de.Entity](commander de.Commander[R, T]) fun
 			}
 
 			if err := de.RecordEvent(tx, event); err != nil {
-				return app.ConcurrencyError
+				if strings.Contains(err.Error(), "UNIQUE constraint failed: domain_events.entity_id, domain_events.entity_version") {
+					return app.ConcurrencyError
+				}
+				return err
 			}
 
 			return nil
@@ -218,6 +223,7 @@ func ExecuteCommand[R de.Command, T de.Entity](commander de.Commander[R, T]) fun
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}
 
+		de.InformEventRecorded()
 		return r.JsonResponse(map[string]any{"ok": true})
 	}
 }
