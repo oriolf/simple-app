@@ -18,10 +18,6 @@ func NewGlobalApiError(msg string) ApiErrors {
 	return ApiErrors{Global: []string{msg}}
 }
 
-func NewFieldApiError(field, msg string) ApiErrors {
-	return ApiErrors{Fields: map[string][]string{field: []string{msg}}}
-}
-
 func (e ApiErrors) Empty() bool {
 	return len(e.Global) == 0 && len(e.Fields) == 0
 }

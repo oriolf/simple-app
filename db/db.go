@@ -3,7 +3,10 @@ package db
 import (
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
+	"io/fs"
+	"path"
 	"sort"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -28,12 +31,12 @@ func InitDB(migrationFiles embed.FS, dataFolder ...string) app.Option {
 }
 
 func initDB(migrationFiles embed.FS, dataFolder ...string) (*sql.DB, error) {
-	path := "db.db"
+	fullPath := "db.db"
 	if dataFolder != nil && len(dataFolder) > 0 && dataFolder[0] != "" {
-		path = dataFolder[0] + "/" + path
+		fullPath = path.Join(dataFolder[0], fullPath)
 	}
 
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite3", fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not open db: %w", err)
 	}
@@ -59,12 +62,15 @@ func migrateFiles(db *sql.DB, application string, migrationFiles embed.FS) error
 	const folder = "migrations"
 	files, err := migrationFiles.ReadDir(folder)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
 		return fmt.Errorf("could not read migration files: %w", err)
 	}
 
 	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
 	for _, file := range files {
-		b, err := migrationFiles.ReadFile(folder + "/" + file.Name())
+		b, err := migrationFiles.ReadFile(path.Join(folder, file.Name()))
 		if err != nil {
 			return fmt.Errorf("could not read migration file %s: %w", file.Name(), err)
 		}
@@ -131,7 +137,7 @@ func transaction(db *sql.DB, f func(*sql.Tx) error) error {
 	return nil
 }
 
-func QueryDB[T any](scanFunc func(rows *sql.Rows) (T, error), stmt string, args ...any) ([]T, error) {
+func Query[T any](scanFunc func(rows *sql.Rows) (T, error), stmt string, args ...any) ([]T, error) {
 	rows, err := db.Query(stmt, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
@@ -157,7 +163,7 @@ func QueryDB[T any](scanFunc func(rows *sql.Rows) (T, error), stmt string, args 
 	return res, nil
 }
 
-func QueryJoinDB[T SQLJoinMerger[T]](
+func QueryJoin[T SQLJoinMerger[T]](
 	scanFunc func(rows *sql.Rows) (T, error),
 	stmt string,
 	args ...any,

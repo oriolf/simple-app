@@ -13,10 +13,6 @@ type Validator struct {
 	params map[string]any
 }
 
-type Validater interface {
-	Validate() app.ApiErrors
-}
-
 func NewValidator(params map[string]any) Validator {
 	return Validator{params: params, errors: app.ApiErrors{Fields: make(map[string][]string)}}
 }
@@ -29,9 +25,8 @@ func (v Validator) AddError(field, msg string) {
 	v.errors.Fields[field] = append(v.errors.Fields[field], msg)
 }
 
-func (v *Validator) Merge(errors app.ApiErrors) {
-	v.errors.Global = append(v.errors.Global, errors.Global...)
-	v.errors.Fields = app.MergeMaps(v.errors.Fields, errors.Fields)
+func (v *Validator) AddGlobalError(msg string) {
+	v.errors.Global = append(v.errors.Global, msg)
 }
 
 func (v Validator) Errors() app.ApiErrors { return v.errors }

@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/oriolf/simple-app/validators"
 )
 
 type Command struct {
@@ -53,6 +55,16 @@ func executeHandler(args []string, c Command) {
 	}
 }
 
+func NewValidator(args []string) validators.Validator {
+	params, err := parseCliParams(args)
+	v := validators.NewValidator(params)
+	if err != nil {
+		v.AddGlobalError(err.Error())
+	}
+
+	return v
+}
+
 func parseCliParams(args []string) (map[string]any, error) {
 	m := make(map[string]any)
 
@@ -61,7 +73,7 @@ func parseCliParams(args []string) (map[string]any, error) {
 		x := args[i]
 		if strings.HasPrefix(x, "-") {
 			param := strings.TrimPrefix(x, "-")
-			if len(args) <= i {
+			if len(args) <= i+1 {
 				return m, fmt.Errorf("Missing value for param «%s»", param)
 			}
 			m[param] = args[i+1]

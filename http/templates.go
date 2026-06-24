@@ -72,12 +72,6 @@ func initTemplates(templateFiles embed.FS, userTemplateFuncs map[string]any) err
 	return nil
 }
 
-func Template(filename string) func(Request) Response {
-	return func(r Request) Response {
-		return r.TemplateResponse(filename, nil, nil)
-	}
-}
-
 func TemplateList[C any, T app.Lister[T, C]](filename string, seed T) func(Request) Response {
 	return func(r Request) Response {
 		paginator := app.NewPaginator(r.MustParameters())

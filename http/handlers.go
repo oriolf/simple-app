@@ -186,7 +186,7 @@ func ExecuteCommand[R de.Command, T de.Entity](commander de.Commander[R, T]) fun
 
 		entity := commander.SeedEntity()
 		query := "SELECT * FROM domain_events WHERE entity_id = ? ORDER BY id ASC"
-		events, err := db.QueryDB(de.ScanDomainEvent, query, command.EntityID())
+		events, err := db.Query(de.ScanDomainEvent, query, command.EntityID())
 		if err != nil {
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}

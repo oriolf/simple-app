@@ -20,7 +20,7 @@ func Add[T SQLInserter](tx *sql.Tx, m T) (uint, error) {
 }
 
 func Get[C any, T SQLGetter[T, C]](m T, id uint, criteria C) (T, error) {
-	items, err := QueryDB(m.Scan, m.SelectSQL(criteria)+" WHERE id=?;", id)
+	items, err := Query(m.Scan, m.SelectSQL(criteria)+" WHERE id=?;", id)
 	if err != nil {
 		return m, fmt.Errorf("could not select: %w", err)
 	}
@@ -31,7 +31,7 @@ func Get[C any, T SQLGetter[T, C]](m T, id uint, criteria C) (T, error) {
 }
 
 func GetBy[C any, T SQLGetter[T, C]](m T, field string, id any, criteria C) (T, error) {
-	items, err := QueryDB(m.Scan, m.SelectSQL(criteria)+" WHERE "+field+"=?;", id)
+	items, err := Query(m.Scan, m.SelectSQL(criteria)+" WHERE "+field+"=?;", id)
 	if err != nil {
 		return m, fmt.Errorf("could not select: %w", err)
 	}
@@ -57,9 +57,9 @@ func List[C any, T SQLLister[T, C]](m T, paginator app.Paginator, criteria C) (i
 		sql = sql + "LIMIT ? OFFSET ?;"
 		limit, offset := paginator.Limit(), paginator.Offset()
 		params = append(params, limit, offset)
-		items, err = QueryDB(m.Scan, sql, params...)
+		items, err = Query(m.Scan, sql, params...)
 	} else {
-		items, err = QueryDB(m.Scan, sql+";", params...)
+		items, err = Query(m.Scan, sql+";", params...)
 	}
 
 	if err != nil {
@@ -94,9 +94,9 @@ func ListJoin[C any, T SQLJoinLister[T, C]](m T, paginator app.Paginator, criter
 	if paginator != nil {
 		sql = sql + "LIMIT ? OFFSET ?;"
 		limit, offset := paginator.Limit(), paginator.Offset()
-		items, err = QueryJoinDB(m.Scan, sql, limit, offset)
+		items, err = QueryJoin(m.Scan, sql, limit, offset)
 	} else {
-		items, err = QueryJoinDB(m.Scan, sql+";")
+		items, err = QueryJoin(m.Scan, sql+";")
 	}
 
 	if err != nil {

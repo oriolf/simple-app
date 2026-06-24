@@ -202,14 +202,14 @@ func executeProjectionAux(projecter Projecter) (repeat bool, err error) {
 func projectEntities(projecter Projecter, lastProcessedEvent, processToEvent uint) func(*sql.Tx) error {
 	return func(tx *sql.Tx) error {
 		query := "SELECT DISTINCT entity_id FROM domain_events WHERE id > ? AND id <= ?"
-		entityIDs, err := db.QueryDB(types.ScanUUID, query, lastProcessedEvent, processToEvent)
+		entityIDs, err := db.Query(types.ScanUUID, query, lastProcessedEvent, processToEvent)
 		if err != nil {
 			return fmt.Errorf("could not query entity ids: %w", err)
 		}
 
 		for _, id := range entityIDs {
 			query := "SELECT * FROM domain_events WHERE entity_id = ? AND id <= ? ORDER BY id ASC"
-			events, err := db.QueryDB(ScanDomainEvent, query, id, processToEvent)
+			events, err := db.Query(ScanDomainEvent, query, id, processToEvent)
 			if err != nil {
 				return fmt.Errorf("could not query events for entity %s: %w", id, err)
 			}

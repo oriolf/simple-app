@@ -4,13 +4,17 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/oriolf/simple-app/types"
+
+	app "github.com/oriolf/simple-app"
 )
 
 type ValidationTestCase struct {
 	input          any
 	expectedError  string
 	expectedString string
-	expectedDate   Date
+	expectedDate   types.Date
 }
 
 func TestValidateStringNonEmpty(t *testing.T) {
@@ -32,18 +36,18 @@ func TestValidateStringNonEmpty(t *testing.T) {
 func TestValidateDate(t *testing.T) {
 	yearRangeError := fmt.Sprintf("L'any ha de ser posterior a 1900 i anterior a %d", time.Now().Year()+5)
 	for i, tc := range []ValidationTestCase{
-		{input: nil, expectedDate: Date{}, expectedError: "El camp ha de ser una cadena de text"},
-		{input: "", expectedDate: Date{}, expectedError: "El camp ha de ser una data completa en format YYYY-mm-dd"},
-		{input: "2000", expectedDate: Date{Year: 2000}, expectedError: "El camp ha de ser una data completa en format YYYY-mm-dd"},
-		{input: "1899-01-01", expectedDate: Date{1899, 1, 1}, expectedError: yearRangeError},
-		{input: "2500-01-01", expectedDate: Date{2500, 1, 1}, expectedError: yearRangeError},
-		{input: "2000-00-01", expectedDate: Date{2000, 0, 1}, expectedError: "El mes ha de ser vàlid (rang 1-12)"},
-		{input: "2000-13-01", expectedDate: Date{2000, 13, 1}, expectedError: "El mes ha de ser vàlid (rang 1-12)"},
-		{input: "2001-02-29", expectedDate: Date{2001, 2, 29}, expectedError: "El camp ha de ser una data vàlida"},
-		{input: "2001-01-32", expectedDate: Date{2001, 1, 32}, expectedError: "El camp ha de ser una data vàlida"},
-		{input: "2001-04-31", expectedDate: Date{2001, 4, 31}, expectedError: "El camp ha de ser una data vàlida"},
-		{input: "2000-02-29", expectedDate: Date{2000, 2, 29}},
-		{input: "2000-01-01", expectedDate: Date{2000, 1, 1}},
+		{input: nil, expectedDate: types.Date{}, expectedError: "El camp ha de ser una cadena de text"},
+		{input: "", expectedDate: types.Date{}, expectedError: "El camp ha de ser una data completa en format YYYY-mm-dd"},
+		{input: "2000", expectedDate: types.Date{Year: 2000}, expectedError: "El camp ha de ser una data completa en format YYYY-mm-dd"},
+		{input: "1899-01-01", expectedDate: types.Date{Year: 1899, Month: 1, Day: 1}, expectedError: yearRangeError},
+		{input: "2500-01-01", expectedDate: types.Date{Year: 2500, Month: 1, Day: 1}, expectedError: yearRangeError},
+		{input: "2000-00-01", expectedDate: types.Date{Year: 2000, Month: 0, Day: 1}, expectedError: "El mes ha de ser vàlid (rang 1-12)"},
+		{input: "2000-13-01", expectedDate: types.Date{Year: 2000, Month: 13, Day: 1}, expectedError: "El mes ha de ser vàlid (rang 1-12)"},
+		{input: "2001-02-29", expectedDate: types.Date{Year: 2001, Month: 2, Day: 29}, expectedError: "El camp ha de ser una data vàlida"},
+		{input: "2001-01-32", expectedDate: types.Date{Year: 2001, Month: 1, Day: 32}, expectedError: "El camp ha de ser una data vàlida"},
+		{input: "2001-04-31", expectedDate: types.Date{Year: 2001, Month: 4, Day: 31}, expectedError: "El camp ha de ser una data vàlida"},
+		{input: "2000-02-29", expectedDate: types.Date{Year: 2000, Month: 2, Day: 29}},
+		{input: "2000-01-01", expectedDate: types.Date{Year: 2000, Month: 1, Day: 1}},
 	} {
 		v := NewValidator(map[string]any{"": tc.input})
 		got := v.ValidateDate("")
@@ -72,7 +76,7 @@ func TestValidateSpanishDNI(t *testing.T) {
 	}
 }
 
-func checkValidationErrors(t *testing.T, i int, expected string, errors ApiErrors) {
+func checkValidationErrors(t *testing.T, i int, expected string, errors app.ApiErrors) {
 	if expected == "" {
 		if errors.NotEmpty() {
 			t.Errorf("[%d] Expected no error, but got %v", i, errors.Fields[""])
