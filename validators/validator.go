@@ -4,6 +4,7 @@ import (
 	"net/mail"
 	"strconv"
 	"strings"
+	"uuid"
 
 	app "github.com/oriolf/simple-app"
 )
@@ -100,6 +101,21 @@ func (v *Validator) ValidateStringNonEmpty(field string) string {
 		return ""
 	}
 	return value
+}
+
+func (v *Validator) ValidateUUID(field string) uuid.UUID {
+	value := v.ValidateStringNonEmpty(field)
+	if v.HasError(field) {
+		return uuid.Nil()
+	}
+
+	id, err := uuid.Parse(value)
+	if err != nil {
+		v.AddError(field, "El valor no és un UUID vàlid")
+		return uuid.Nil()
+	}
+
+	return id
 }
 
 func (v *Validator) ValidatePassword(field string) string {

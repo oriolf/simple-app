@@ -50,7 +50,7 @@ func Login(r Request) Response {
 		return err
 	}
 	if err := db.Transaction(f); err != nil {
-		return r.JsonGlobalError(http.StatusInternalServerError, "", err)
+		return r.JsonGlobalError(http.StatusInternalServerError, "No s'ha pogut crear la sessió", err)
 	}
 	c := http.Cookie{
 		Name:  "_session",
@@ -65,7 +65,7 @@ func Me(r Request) Response {
 	s := users.Session{UserID: r.User.ID}
 	sessions, _, err := db.List(s, nil, struct{}{})
 	if err != nil {
-		return r.JsonGlobalError(http.StatusInternalServerError, "", err)
+		return r.JsonGlobalError(http.StatusInternalServerError, "No s'han pogut llistar les sessions", err)
 	}
 
 	r.User.Sessions = sessions

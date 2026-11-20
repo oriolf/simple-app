@@ -33,8 +33,11 @@ func UserAuthentication(handler func(Request) Response) func(Request) Response {
 		var err error
 		r.User, err = authenticate(r)
 		if err != nil {
-			r.Log("Got an authentication error: %s", err)
-			return r.JsonGlobalError(http.StatusUnauthorized, "", err)
+			return r.JsonGlobalError(
+				http.StatusUnauthorized,
+				"Has d'iniciar sessió per accedir a aquest recurs",
+				fmt.Errorf("could not authenticate: %w", err),
+			)
 		}
 		return handler(r)
 	}

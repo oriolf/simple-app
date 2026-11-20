@@ -56,6 +56,8 @@ func (g httpGroup) Handle(url string, handler func(Request) Response) {
 	Handle(url, handler, g.options...)
 }
 
+func Noop(r Request) Response { return r.JsonResponse(nil) }
+
 func Handle(url string, handler func(Request) Response, options ...option) {
 	for _, option := range options {
 		handler = option(handler)

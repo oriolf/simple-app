@@ -3,8 +3,10 @@ package app
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
+	"uuid"
 )
 
 var ConcurrencyError = errors.New("Concurrency error")
@@ -47,6 +49,19 @@ func (e ApiErrors) appendCliSubmessages(msgs []string, newMessages []string) []s
 	return msgs
 }
 
+type ID interface {
+	uint | string
+}
+
+type Merger[T any] interface {
+	Merge(T) T
+}
+
+type IDMerger[T any, K ID] interface {
+	GetID() K
+	Merger[T]
+}
+
 type Validator interface {
 	Validate(map[string]any) ApiErrors
 }
@@ -75,8 +90,16 @@ type Deleter interface {
 	Delete(*sql.Tx, uint) error
 }
 
+type UUIDDeleter interface {
+	UUIDDelete(*sql.Tx, string) error
+}
+
 type Getter[T any] interface {
 	Get(uint) (T, error)
+}
+
+type UUIDGetter[T any] interface {
+	UUIDGet(string) (T, error)
 }
 
 type Lister[T, C any] interface {
@@ -140,4 +163,18 @@ func (p paginator) Shown() uint {
 		return p.itemsPerPage
 	}
 	return shown
+}
+
+func ScanUUID(rows *sql.Rows) (uuid.UUID, error) {
+	var s string
+	if err := rows.Scan(&s); err != nil {
+		return uuid.Nil(), fmt.Errorf("could not scan string: %w", err)
+	}
+
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil(), fmt.Errorf("could not parse uuid: %w", err)
+	}
+
+	return id, nil
 }

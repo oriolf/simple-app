@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	"uuid"
 
 	"github.com/oriolf/simple-app/db"
 	"github.com/oriolf/simple-app/types"
@@ -24,7 +25,7 @@ type DomainEvent struct {
 	ID            uint
 	OccurredOn    types.DateTime
 	Name          DomainEventName
-	EntityID      types.UUID
+	EntityID      uuid.UUID
 	EntityVersion EntityVersion
 	Payload       types.JSON
 }
@@ -49,12 +50,12 @@ type Projecter interface {
 }
 
 type Hydrater interface {
-	SetEntityID(types.UUID)
+	SetEntityID(uuid.UUID)
 	Hydrate(DomainEvent)
 }
 
 type Command interface {
-	EntityID() types.UUID
+	EntityID() uuid.UUID
 	ExpectedVersion() EntityVersion
 }
 
@@ -202,7 +203,7 @@ func executeProjectionAux(projecter Projecter) (repeat bool, err error) {
 func projectEntities(projecter Projecter, lastProcessedEvent, processToEvent uint) func(*sql.Tx) error {
 	return func(tx *sql.Tx) error {
 		query := "SELECT DISTINCT entity_id FROM domain_events WHERE id > ? AND id <= ?"
-		entityIDs, err := db.Query(types.ScanUUID, query, lastProcessedEvent, processToEvent)
+		entityIDs, err := db.Query(app.ScanUUID, query, lastProcessedEvent, processToEvent)
 		if err != nil {
 			return fmt.Errorf("could not query entity ids: %w", err)
 		}

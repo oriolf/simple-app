@@ -80,7 +80,7 @@ func getListParams[C any, T SQLLister[T, C]](m T, criteria C) []any {
 	return []any{}
 }
 
-func ListJoin[C any, T SQLJoinLister[T, C]](m T, paginator app.Paginator, criteria C) (items []T, total uint, err error) {
+func ListJoin[C any, T SQLJoinLister[T, C, K], K app.ID](m T, paginator app.Paginator, criteria C) (items []T, total uint, err error) {
 	row := db.QueryRow(m.CountSQL(criteria))
 	if err := row.Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("could not count: %w", err)

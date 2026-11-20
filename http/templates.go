@@ -72,6 +72,17 @@ func initTemplates(templateFiles embed.FS, userTemplateFuncs map[string]any) err
 	return nil
 }
 
+func TemplateUUIDGet[T app.UUIDGetter[T]](filename string, seed T) func(Request) Response {
+	return func(r Request) Response {
+		item, err := seed.UUIDGet(r.r.PathValue("id"))
+		if err != nil {
+			return r.TemplateError(err)
+		}
+
+		return r.TemplateResponse(filename, item, nil)
+	}
+}
+
 func TemplateList[C any, T app.Lister[T, C]](filename string, seed T) func(Request) Response {
 	return func(r Request) Response {
 		paginator := app.NewPaginator(r.MustParameters())

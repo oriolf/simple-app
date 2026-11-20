@@ -163,7 +163,7 @@ func Query[T any](scanFunc func(rows *sql.Rows) (T, error), stmt string, args ..
 	return res, nil
 }
 
-func QueryJoin[T SQLJoinMerger[T]](
+func QueryJoin[T SQLJoinMerger[T, K], K app.ID](
 	scanFunc func(rows *sql.Rows) (T, error),
 	stmt string,
 	args ...any,
@@ -174,25 +174,15 @@ func QueryJoin[T SQLJoinMerger[T]](
 	}
 	defer rows.Close()
 
-	res := make(map[uint]T)
-	orders := make(map[uint]int)
-	rowIndex, modelIndex := 0, 0
+	var list []T
+	var rowIndex int
 	for rows.Next() {
 		x, err := scanFunc(rows)
 		if err != nil {
 			return nil, fmt.Errorf("error scaning row %d: %w", rowIndex, err)
 		}
 
-		id := x.GetID()
-		previous, ok := res[id]
-		if ok {
-			res[id] = previous.Merge(x)
-		} else {
-			res[id] = x
-			orders[id] = modelIndex
-			modelIndex++
-		}
-
+		list = append(list, x)
 		rowIndex++
 	}
 
@@ -200,14 +190,5 @@ func QueryJoin[T SQLJoinMerger[T]](
 		return nil, fmt.Errorf("final error in rows: %w", err)
 	}
 
-	var list []T
-	for _, m := range res {
-		list = append(list, m)
-	}
-
-	sort.Slice(list, func(i, j int) bool {
-		return orders[list[i].GetID()] < orders[list[j].GetID()]
-	})
-
-	return list, nil
+	return app.UniqueMerge(list), nil
 }

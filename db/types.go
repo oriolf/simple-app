@@ -2,6 +2,8 @@ package db
 
 import (
 	"database/sql"
+
+	app "github.com/oriolf/simple-app"
 )
 
 type Scanner[T any] interface {
@@ -47,12 +49,11 @@ type SQLLister[T, C any] interface {
 	SQLCounter[C]
 }
 
-type SQLJoinMerger[T any] interface {
-	GetID() uint
-	Merge(T) T
+type SQLJoinMerger[T any, K app.ID] interface {
+	app.IDMerger[T, K]
 }
 
-type SQLJoinLister[T, C any] interface {
+type SQLJoinLister[T, C any, K app.ID] interface {
 	SQLLister[T, C]
-	SQLJoinMerger[T]
+	SQLJoinMerger[T, K]
 }

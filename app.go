@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 
 	telegram "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -47,9 +48,14 @@ func RegisterErrorTranslations(translations map[string]string) Option {
 }
 
 func SendTelegram(text string) error {
+	if bot == nil {
+		return errors.New("uninitialized telegram bot")
+	}
+
 	msg := telegram.NewMessage(TELEGRAM_CHAT, text)
 	if _, err := bot.Send(msg); err != nil {
 		return fmt.Errorf("could not send: %w", err)
 	}
+
 	return nil
 }

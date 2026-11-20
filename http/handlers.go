@@ -147,6 +147,17 @@ func Delete[T app.Deleter](seed T) func(Request) Response {
 	}
 }
 
+func UUIDDelete[T app.UUIDDeleter](seed T) func(Request) Response {
+	return func(r Request) Response {
+		f := func(tx *sql.Tx) (err error) { return seed.UUIDDelete(tx, r.r.PathValue("id")) }
+		if err := db.Transaction(f); err != nil {
+			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
+		}
+
+		return r.JsonResponse(map[string]any{})
+	}
+}
+
 func Get[T app.Getter[T]](seed T) func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))

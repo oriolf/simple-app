@@ -66,6 +66,10 @@ func (r *Request) Parameters() (map[string]any, error) {
 
 func (r Request) parseParameters() (map[string]any, error) {
 	params := make(map[string]any)
+	if value := r.r.PathValue("parent_id"); value != "" {
+		params["parent_id"] = value
+	}
+
 	if r.r.Header.Get("Content-Type") == "application/json" {
 		err := r.DecodeJsonBody(&params)
 		if err != nil && !errors.Is(err, io.EOF) {

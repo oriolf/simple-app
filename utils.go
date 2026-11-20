@@ -3,6 +3,7 @@ package app
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"sort"
 	"strings"
 	"time"
 )
@@ -13,6 +14,34 @@ func ExecutePeriodically(f func(), delay, interval time.Duration) {
 	for range time.Tick(interval) {
 		f()
 	}
+}
+
+func UniqueMerge[T IDMerger[T, K], K ID](list []T) (out []T) {
+	res := make(map[K]T)
+	orders := make(map[K]int)
+	modelIndex := 0
+
+	for _, x := range list {
+		id := x.GetID()
+		previous, ok := res[id]
+		if ok {
+			res[id] = previous.Merge(x)
+		} else {
+			res[id] = x
+			orders[id] = modelIndex
+			modelIndex++
+		}
+	}
+
+	for _, m := range res {
+		out = append(out, m)
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return orders[out[i].GetID()] < orders[out[j].GetID()]
+	})
+
+	return out
 }
 
 func InSlice[T comparable](x T, list []T) bool {
