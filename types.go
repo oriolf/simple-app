@@ -62,23 +62,27 @@ type IDMerger[T any, K ID] interface {
 	Merger[T]
 }
 
-type Validator interface {
+type Validator[T any] interface {
 	Validate(map[string]any) ApiErrors
+	*T
 }
 
 type PatchValidator interface {
 	ValidatePatch(string, any) (string, any, ApiErrors)
 }
 
-type Adder interface {
+type Adder[T any] interface {
 	Add(*sql.Tx) (uint, error)
-	Validator
 }
 
-type Updater interface {
-	SetID(uint)
+type Updater[T any] interface {
 	Update(*sql.Tx) error
-	Validator
+}
+
+type ValidatorIDSetter[T any] interface {
+	SetID(uint)
+	Validator[T]
+	*T
 }
 
 type Patcher interface {

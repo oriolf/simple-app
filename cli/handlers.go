@@ -3,16 +3,19 @@ package cli
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 
 	app "github.com/oriolf/simple-app"
 	"github.com/oriolf/simple-app/db"
 )
 
-func Add[T app.Adder](seed func() T) func([]string) []string {
+func Add[T app.Adder[T], PT app.Validator[T]](seeds ...func() *T) func([]string) []string {
 	return func(args []string) []string {
-		a := seed()
+		a := PT(new(T))
+		if seeds != nil {
+			a = seeds[0]()
+		}
 
 		params, err := parseCliParams(args)
 		if err != nil {
@@ -25,7 +28,7 @@ func Add[T app.Adder](seed func() T) func([]string) []string {
 
 		var id uint
 		f := func(tx *sql.Tx) (err error) {
-			id, err = a.Add(tx)
+			id, err = (*a).Add(tx)
 			return err
 		}
 		if err := db.Transaction(f); err != nil {
@@ -55,7 +58,7 @@ func generateTypescriptTypes(model any) {
 	}
 	s += "}\n"
 
-	ioutil.WriteFile(t.Name()+".ts", []byte(s), 0644)
+	os.WriteFile(t.Name()+".ts", []byte(s), 0644)
 }
 
 func getTypescriptType(t reflect.Type) string {

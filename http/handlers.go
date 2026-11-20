@@ -15,10 +15,10 @@ import (
 	de "github.com/oriolf/simple-app/domain-events"
 )
 
-func Add[T app.Adder](seed func() T) func(Request) Response {
+func Add[T app.Adder[T], PT app.Validator[T]]() func(Request) Response {
 	return func(r Request) Response {
 		params, err := r.Parameters()
-		a := seed()
+		a := PT(new(T))
 		if err != nil {
 			r.Log("Could not decode data: %s", err)
 			return r.JsonGlobalError(http.StatusBadRequest, "Petició mal formada", err)
@@ -30,7 +30,7 @@ func Add[T app.Adder](seed func() T) func(Request) Response {
 
 		var id uint
 		f := func(tx *sql.Tx) (err error) {
-			id, err = a.Add(tx)
+			id, err = (*a).Add(tx)
 			return err
 		}
 		if err := db.Transaction(f); err != nil {
@@ -41,10 +41,10 @@ func Add[T app.Adder](seed func() T) func(Request) Response {
 	}
 }
 
-func QueryAdd[T app.Adder](seed func() T) func(Request) Response {
+func QueryAdd[T app.Adder[T], PT app.Validator[T]]() func(Request) Response {
 	return func(r Request) Response {
 		params, err := r.Parameters()
-		a := seed()
+		a := PT(new(T))
 		if err != nil {
 			r.Log("Could not decode data: %s", err)
 			return r.JsonGlobalError(http.StatusBadRequest, "Petició mal formada", err)
@@ -58,10 +58,10 @@ func QueryAdd[T app.Adder](seed func() T) func(Request) Response {
 	}
 }
 
-func Update[T app.Updater](seed func() T) func(Request) Response {
+func Update[T app.Updater[T], PT app.ValidatorIDSetter[T]]() func(Request) Response {
 	return func(r Request) Response {
 		id, err := strconv.Atoi(r.r.PathValue("id"))
-		a := seed()
+		a := PT(new(T))
 		if err != nil {
 			return r.JsonGlobalError(http.StatusBadRequest, err.Error(), err)
 		}
@@ -78,7 +78,7 @@ func Update[T app.Updater](seed func() T) func(Request) Response {
 			return r.JsonError(http.StatusUnprocessableEntity, apiErrors, nil)
 		}
 
-		if err := db.Transaction(a.Update); err != nil {
+		if err := db.Transaction((*a).Update); err != nil {
 			return r.JsonGlobalError(http.StatusInternalServerError, err.Error(), err)
 		}
 
