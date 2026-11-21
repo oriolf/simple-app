@@ -1,14 +1,88 @@
 package cli
 
 import (
+	"bufio"
 	"database/sql"
 	"fmt"
 	"os"
+	"os/exec"
 	"reflect"
+	"time"
 
 	app "github.com/oriolf/simple-app"
 	"github.com/oriolf/simple-app/db"
 )
+
+func DevServer(commandName string) func([]string) []string {
+	return func([]string) []string {
+		checkSum := ""
+		for {
+			newCheckSum, err := computeCodeChecksum()
+			if err != nil {
+				return []string{err.Error()}
+			}
+
+			if checkSum != newCheckSum {
+				go func() {
+					if err := restartDevServer(commandName); err != nil {
+						fmt.Println("Could not restart dev server:", err)
+					}
+				}()
+				checkSum = newCheckSum
+			}
+
+			time.Sleep(1 * time.Second)
+		}
+	}
+}
+
+func computeCodeChecksum() (string, error) {
+	cmd := "ls *.go migrations/* static/* templates/* | xargs -I {} md5sum {}"
+	output, err := exec.Command("bash", "-c", cmd).Output()
+	if err != nil {
+		return "", fmt.Errorf("could not compute checksums: %w", err)
+	}
+
+	return string(output), nil
+}
+
+func restartDevServer(commandName string) error {
+	fmt.Println("Restarting dev server...")
+
+	binary := "simple-app-dev-server"
+	if err := executa(fmt.Sprintf("killall %s || true", binary)); err != nil {
+		return fmt.Errorf("could not kill previous process: %w", err)
+	}
+
+	if err := executa(fmt.Sprintf("go build -o %s", binary)); err != nil {
+		return fmt.Errorf("could not build new binary: %w", err)
+	}
+
+	cmd := exec.Command("bash", "-c", fmt.Sprintf("./%s %s", binary, commandName))
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("could not get stderr: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("could not start new server: %w", err)
+	}
+
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			fmt.Println(scanner.Text())
+		}
+	}()
+
+	cmd.Wait()
+
+	return nil
+}
+
+func executa(cmd string) error {
+	return exec.Command("bash", "-c", cmd).Run()
+}
 
 func Add[T app.Adder[T], PT app.Validator[T]](seeds ...func() *T) func([]string) []string {
 	return func(args []string) []string {
