@@ -44,6 +44,16 @@ func UniqueMerge[T IDMerger[T, K], K ID](list []T) (out []T) {
 	return out
 }
 
+func Unique[T comparable](list []T) (out []T) {
+	for _, e := range list {
+		if !InSlice(e, out) {
+			out = append(out, e)
+		}
+	}
+
+	return out
+}
+
 func InSlice[T comparable](x T, list []T) bool {
 	for _, e := range list {
 		if e == x {

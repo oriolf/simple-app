@@ -1,8 +1,11 @@
 package app
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 
 	telegram "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -25,6 +28,26 @@ func Init(options ...Option) (err error) {
 			return err
 		}
 	}
+	return nil
+}
+
+func LoadDotEnv() error {
+	f, err := os.Open(".env")
+	if err != nil {
+		return fmt.Errorf("could not read .env file: %w", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.Split(scanner.Text(), "=")
+		key := line[0]
+		value := line[1]
+		if err := os.Setenv(key, value); err != nil {
+			return fmt.Errorf("could not set environment variable %s: %w", key, err)
+		}
+	}
+
 	return nil
 }
 

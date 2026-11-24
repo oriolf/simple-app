@@ -7,11 +7,17 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strings"
 	"time"
+
+	_ "embed"
 
 	app "github.com/oriolf/simple-app"
 	"github.com/oriolf/simple-app/db"
 )
+
+//go:embed Dockerfile
+var dockerfile string
 
 func DevServer(commandName string) func([]string) []string {
 	return func([]string) []string {
@@ -50,11 +56,11 @@ func restartDevServer(commandName string) error {
 	fmt.Println("Restarting dev server...")
 
 	binary := "simple-app-dev-server"
-	if err := executa(fmt.Sprintf("killall %s || true", binary)); err != nil {
+	if _, err := executa(fmt.Sprintf("killall %s || true", binary)); err != nil {
 		return fmt.Errorf("could not kill previous process: %w", err)
 	}
 
-	if err := executa(fmt.Sprintf("go build -o %s", binary)); err != nil {
+	if _, err := executa(fmt.Sprintf("go build -o %s", binary)); err != nil {
 		return fmt.Errorf("could not build new binary: %w", err)
 	}
 
@@ -80,8 +86,72 @@ func restartDevServer(commandName string) error {
 	return nil
 }
 
-func executa(cmd string) error {
-	return exec.Command("bash", "-c", cmd).Run()
+func executa(cmd string) (string, error) {
+	fmt.Printf("Executant «%s»\n", cmd)
+	b, err := exec.Command("bash", "-c", cmd).Output()
+	return string(b), err
+}
+
+func Deploy(serviceName string) func([]string) []string {
+	f := func() error {
+		repositoryUrl := os.Getenv("DOCKER_REPOSITORY_URL")
+		serverAlias := os.Getenv("DEPLOYMENT_SERVER_ALIAS")
+		deploymentsFolder := os.Getenv("DEPLOYMENTS_FOLDER")
+		if repositoryUrl == "" || serverAlias == "" || deploymentsFolder == "" {
+			return fmt.Errorf("Falten variables d'entorn: DOCKER_REPOSITORY_URL, DEPLOYMENT_SERVER_ALIAS o DEPLOYMENTS_FOLDER")
+		}
+
+		version, err := executa("git rev-parse --short HEAD")
+		if err != nil {
+			return fmt.Errorf("No s'ha pogut llegir la versió de git: %w", err)
+		}
+
+		if err := os.WriteFile("Dockerfile", []byte(dockerfile), 0666); err != nil {
+			return fmt.Errorf("No s'ha pogut escriure el Dockerfile: %w", err)
+		}
+
+		version = strings.TrimSpace(version)
+		imageName := fmt.Sprintf("%s/%s:%s", repositoryUrl, serviceName, version)
+		if _, err := executa(fmt.Sprintf("docker build -t %s .", imageName)); err != nil {
+			return fmt.Errorf("No s'ha pogut construir la imatge de docker: %w", err)
+		}
+
+		if err := os.Remove("Dockerfile"); err != nil {
+			return fmt.Errorf("No s'ha esborrar el Dockerfile: %w", err)
+		}
+
+		if _, err := executa(fmt.Sprintf("docker push %s", imageName)); err != nil {
+			return fmt.Errorf("No s'ha pogut enviar la imatge de docker: %w", err)
+		}
+
+		if _, err := executa(fmt.Sprintf("ssh %s 'docker pull %s'", serverAlias, imageName)); err != nil {
+			return fmt.Errorf("No s'ha pogut rebre la imatge de docker: %w", err)
+		}
+
+		composeFile := "docker-compose.yml"
+		command := fmt.Sprintf(
+			"cd %s && python -m yq '.services.%s.image = \"%s\"' %s | sponge %s",
+			deploymentsFolder, serviceName, imageName, composeFile, composeFile,
+		)
+
+		if _, err := executa(fmt.Sprintf(`ssh -t %s "%s"`, serverAlias, command)); err != nil {
+			return fmt.Errorf("No s'ha pogut actualitzar la versió del docker compose: %w", err)
+		}
+
+		command = fmt.Sprintf("cd %s && docker compose up -d", deploymentsFolder)
+		if _, err := executa(fmt.Sprintf(`ssh -t %s "%s"`, serverAlias, command)); err != nil {
+			return fmt.Errorf("No s'ha pogut actualitzar el docker compose: %w", err)
+		}
+
+		return nil
+	}
+
+	return func(args []string) []string {
+		if err := f(); err != nil {
+			return []string{err.Error()}
+		}
+		return nil
+	}
 }
 
 func Add[T app.Adder[T], PT app.Validator[T]](seeds ...func() *T) func([]string) []string {
