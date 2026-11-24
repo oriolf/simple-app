@@ -130,7 +130,7 @@ func Deploy(serviceName string) func([]string) []string {
 
 		composeFile := "docker-compose.yml"
 		command := fmt.Sprintf(
-			"cd %s && python -m yq '.services.%s.image = \"%s\"' %s | sponge %s",
+			"cd %s && yq '.services.%s.image = \"%s\"' %s | sponge %s",
 			deploymentsFolder, serviceName, imageName, composeFile, composeFile,
 		)
 
